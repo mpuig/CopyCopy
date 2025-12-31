@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CopyCopy - Actions Documentation</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/themes/vue.css">
+  <style>
+    :root {
+      --theme-color: #3884ff;
+    }
+    .markdown-section {
+      max-width: 800px;
+    }
+    .sidebar {
+      display: none;
+    }
+    .content {
+      padding-top: 20px;
+    }
+    nav.app-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50px;
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      z-index: 100;
+      border-bottom: 1px solid #222;
+    }
+    nav.app-nav a {
+      color: #888;
+      text-decoration: none;
+      margin-right: 20px;
+      font-size: 13px;
+      font-family: monospace;
+    }
+    nav.app-nav a:hover {
+      color: #fff;
+    }
+    nav.app-nav a.brand {
+      color: #fff;
+      font-weight: bold;
+      margin-right: 40px;
+    }
+    main {
+      padding-top: 60px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="app-nav">
+    <a href="./" class="brand">CopyCopy_</a>
+    <a href="./actions.html">DOCS</a>
+    <a href="https://github.com/mpuig/copycopy">SRC</a>
+    <a href="https://github.com/mpuig/copycopy/releases/latest">RELEASES</a>
+  </nav>
+  <main id="app"></main>
+  <script>
+    window.$docsify = {
+      name: 'CopyCopy',
+      loadSidebar: false,
+      loadNavbar: false,
+      homepage: 'ACTIONS.md',
+      notFoundPage: true,
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+</body>
+</html>

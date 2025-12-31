@@ -1,12 +1,22 @@
 import Cocoa
 import SwiftUI
 
-@MainActor
-final class ActionEditorWindowController {
-    static let shared = ActionEditorWindowController()
-    private var window: NSWindow?
+private class ActionEditorWindow: NSWindow {
+    var onEscape: (() -> Void)?
 
-    private init() {}
+    override func cancelOperation(_ sender: Any?) {
+        onEscape?()
+    }
+}
+
+@MainActor
+final class ActionEditorWindowController: NSObject {
+    static let shared = ActionEditorWindowController()
+    private var window: ActionEditorWindow?
+
+    private override init() {
+        super.init()
+    }
 
     func show(
         action: CustomAction,
@@ -35,14 +45,27 @@ final class ActionEditorWindowController {
 
         let hostingController = NSHostingController(rootView: editorView)
 
-        let newWindow = NSWindow(contentViewController: hostingController)
+        let newWindow = ActionEditorWindow(contentViewController: hostingController)
         newWindow.title = isNew ? "New Action" : "Edit Action"
         newWindow.styleMask = [.titled, .closable]
         newWindow.center()
         newWindow.isReleasedWhenClosed = false
         newWindow.level = .floating
+        newWindow.delegate = self
+
+        newWindow.onEscape = { [weak self, weak newWindow] in
+            onCancel()
+            newWindow?.close()
+            self?.window = nil
+        }
 
         self.window = newWindow
         newWindow.makeKeyAndOrderFront(nil)
+    }
+}
+
+extension ActionEditorWindowController: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        window = nil
     }
 }

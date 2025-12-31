@@ -26,7 +26,8 @@ final class SettingsWindowController {
 
         let newWindow = NSWindow(contentViewController: hostingController)
         newWindow.title = "CopyCopy Settings"
-        newWindow.styleMask = [.titled, .closable]
+        newWindow.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+        newWindow.minSize = NSSize(width: 500, height: 400)
         newWindow.center()
         newWindow.setFrameAutosaveName("SettingsWindow")
         newWindow.isReleasedWhenClosed = false

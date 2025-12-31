@@ -9,12 +9,12 @@ struct SettingsActionsPane: View {
         ScrollView(.vertical, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 16) {
                 SettingsSection(contentSpacing: 12) {
-                    Text("Custom Actions")
+                    Text("Actions")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
 
-                    Text("Create actions that appear in the menu when you double ⌘C. Use {text} as a placeholder for the copied content.")
+                    Text("Actions appear in the menu when you double ⌘C. Enable, disable, or create custom actions. Use {text} as a placeholder for the copied content.")
                         .font(.footnote)
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -48,14 +48,21 @@ struct SettingsActionsPane: View {
 
                         if !actionsStore.actions.isEmpty {
                             Button(role: .destructive) {
-                                if let selected = selectedAction {
+                                if let selected = selectedAction, !selected.isBuiltIn {
                                     actionsStore.removeAction(selected)
                                     selectedAction = nil
                                 }
                             } label: {
                                 Label("Remove", systemImage: "trash")
                             }
-                            .disabled(selectedAction == nil)
+                            .disabled(selectedAction == nil || selectedAction?.isBuiltIn == true)
+                        }
+
+                        Button {
+                            actionsStore.resetToDefaults()
+                            selectedAction = nil
+                        } label: {
+                            Label("Reset", systemImage: "arrow.counterclockwise")
                         }
                     }
                 }
@@ -143,24 +150,47 @@ private struct ActionRowView: View {
                 .foregroundStyle(action.isEnabled ? .primary : .tertiary)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(action.name)
-                    .font(.body)
-                    .foregroundStyle(action.isEnabled ? .primary : .secondary)
+                HStack(spacing: 6) {
+                    Text(action.name)
+                        .font(.body)
+                        .foregroundStyle(action.isEnabled ? .primary : .secondary)
+
+                    if action.isBuiltIn {
+                        Text("Built-in")
+                            .font(.caption2)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.accentColor.opacity(0.2))
+                            .foregroundStyle(.secondary)
+                            .cornerRadius(3)
+                    }
+                }
 
                 HStack(spacing: 6) {
-                    Text(action.actionType.displayName)
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.quaternary)
-                        .cornerRadius(4)
-
                     if action.contentFilter != .any {
                         Text(action.contentFilter.displayName)
                             .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(.quaternary)
+                            .cornerRadius(4)
+                    }
+
+                    if action.sourceFilter != .any {
+                        Text(action.sourceFilter.displayName)
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.quaternary)
+                            .cornerRadius(4)
+                    }
+
+                    if action.entityFilter != .any {
+                        Text(action.entityFilter.displayName)
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.2))
                             .cornerRadius(4)
                     }
                 }
@@ -172,24 +202,36 @@ private struct ActionRowView: View {
                 Text("Disabled")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
+                    .padding(.trailing, 4)
             }
+
+            Button {
+                onEdit()
+            } label: {
+                Image(systemName: "pencil")
+                    .font(.caption)
+            }
+            .buttonStyle(.borderless)
+            .help("Edit action")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
         .cornerRadius(6)
         .contentShape(Rectangle())
-        .onTapGesture {
-            onSelect()
-        }
         .onTapGesture(count: 2) {
             onEdit()
+        }
+        .onTapGesture {
+            onSelect()
         }
         .contextMenu {
             Button("Edit") { onEdit() }
             Button("Duplicate") { onDuplicate() }
-            Divider()
-            Button("Delete", role: .destructive) { onDelete() }
+            if !action.isBuiltIn {
+                Divider()
+                Button("Delete", role: .destructive) { onDelete() }
+            }
         }
     }
 }

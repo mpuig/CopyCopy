@@ -12,15 +12,26 @@ source "$ROOT_DIR/version.env"
 swift build -c release
 
 # Get the binary path
-BIN_PATH="$(swift build -c release --show-bin-path)/CopyCopy"
+BUILD_DIR="$(swift build -c release --show-bin-path)"
+BIN_PATH="$BUILD_DIR/CopyCopy"
 
 # Create app bundle
 APP_DIR="$ROOT_DIR/dist/CopyCopy.app"
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
+mkdir -p "$APP_DIR/Contents/Frameworks"
 
 cp "$BIN_PATH" "$APP_DIR/Contents/MacOS/CopyCopy"
+
+# Copy Sparkle framework
+SPARKLE_SRC="$BUILD_DIR/Sparkle.framework"
+if [ -d "$SPARKLE_SRC" ]; then
+    cp -R "$SPARKLE_SRC" "$APP_DIR/Contents/Frameworks/"
+
+    # Update rpath to find framework in app bundle
+    install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP_DIR/Contents/MacOS/CopyCopy" 2>/dev/null || true
+fi
 
 GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
 BUILD_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"

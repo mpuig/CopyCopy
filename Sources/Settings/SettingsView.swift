@@ -5,9 +5,6 @@ enum SettingsTab: String, Hashable {
     case actions
     case about
     case debug
-
-    static let windowWidth: CGFloat = 500
-    static let windowHeight: CGFloat = 450
 }
 
 @MainActor
@@ -40,7 +37,7 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
-        .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
+        .frame(minWidth: 500, idealWidth: 550, minHeight: 450, idealHeight: 550)
         .onChange(of: settings.debugMenuEnabled) { _, newValue in
             if !newValue && selectedTab == .debug {
                 selectedTab = .general

@@ -4,7 +4,6 @@ import SwiftUI
 @MainActor
 struct ActionEditorView: View {
     @State private var action: CustomAction
-    @State private var templateHeight: CGFloat = 120
     let isNew: Bool
     let onSave: (CustomAction) -> Void
     let onCancel: () -> Void
@@ -17,68 +16,163 @@ struct ActionEditorView: View {
     }
 
     private var isValid: Bool {
-        !action.name.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !action.template.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasName = !action.name.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasTemplate = !action.template.trimmingCharacters(in: .whitespaces).isEmpty
+        return hasName && (hasTemplate || !action.actionType.requiresTemplate)
+    }
+
+    private var editableActionTypes: [ActionType] {
+        [.openURL, .shellCommand, .openApp]
+    }
+
+    private var showEntityFilter: Bool {
+        action.contentFilter == .text || action.contentFilter == .any
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            Divider()
             formContent
             Divider()
             footer
         }
-        .frame(width: 700, height: 780)
-    }
-
-    private var header: some View {
-        HStack {
-            Text(isNew ? "New Action" : "Edit Action")
-                .font(.headline)
-            Spacer()
+        .frame(width: 560, height: 540)
+        .onChange(of: action.contentFilter) { _, newValue in
+            if newValue != .text && newValue != .any {
+                action.entityFilter = .any
+            }
         }
-        .padding()
+        .onChange(of: action.actionType) { _, newValue in
+            action.systemImage = newValue.systemImage
+        }
     }
 
     private var formContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 nameSection
-                typeSection
-                templateSection
-                filterSection
-                iconSection
+                ifSection
+                thenSection
                 enabledSection
             }
             .padding()
         }
     }
 
+    // MARK: - Name Section
+
     private var nameSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Name")
-                .font(.subheadline.weight(.medium))
             TextField("Action name", text: $action.name)
                 .textFieldStyle(.roundedBorder)
-            Text("The name shown in the menu.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+                .font(.title3)
         }
     }
 
-    private var typeSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Action Type")
-                .font(.subheadline.weight(.medium))
-            Picker("Type", selection: $action.actionType) {
-                ForEach(ActionType.allCases) { type in
-                    Label(type.displayName, systemImage: type.systemImage)
-                        .tag(type)
+    // MARK: - IF Section
+
+    private var ifSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("IF", systemImage: "questionmark.diamond")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.orange)
+
+            VStack(spacing: 10) {
+                conditionRow("Content is", width: 100) {
+                    Picker("Content", selection: $action.contentFilter) {
+                        ForEach(ContentTypeFilter.allCases) { filter in
+                            Text(filter.displayName).tag(filter)
+                        }
+                    }
+                    .labelsHidden()
+                }
+
+                conditionRow("Copied from", width: 100) {
+                    Picker("Source", selection: $action.sourceFilter) {
+                        ForEach(SourceContextFilter.allCases) { filter in
+                            Text(filter.displayName).tag(filter)
+                        }
+                    }
+                    .labelsHidden()
+                }
+
+                if showEntityFilter {
+                    conditionRow("Detected as", width: 100) {
+                        Picker("Entity", selection: $action.entityFilter) {
+                            ForEach(EntityFilter.allCases) { filter in
+                                Text(filter.displayName).tag(filter)
+                            }
+                        }
+                        .labelsHidden()
+                    }
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            .padding(12)
+            .background(Color.orange.opacity(0.08))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+            )
+        }
+    }
+
+    private func conditionRow<Content: View>(_ label: String, width: CGFloat, @ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(width: width, alignment: .leading)
+            content()
+            Spacer()
+        }
+    }
+
+    // MARK: - THEN Section
+
+    private var thenSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("THEN", systemImage: "arrow.right.circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.blue)
+
+            VStack(alignment: .leading, spacing: 12) {
+                actionTypePicker
+
+                if action.actionType.requiresTemplate {
+                    templateEditor
+                }
+            }
+            .padding(12)
+            .background(Color.blue.opacity(0.08))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+            )
+        }
+    }
+
+    private var actionTypePicker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if action.isBuiltIn && !editableActionTypes.contains(action.actionType) {
+                HStack {
+                    Label(action.actionType.displayName, systemImage: action.actionType.systemImage)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.quaternary)
+                        .cornerRadius(6)
+                    Spacer()
+                }
+            } else {
+                Picker("Action", selection: $action.actionType) {
+                    ForEach(editableActionTypes) { type in
+                        Label(type.displayName, systemImage: type.systemImage)
+                            .tag(type)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
 
             Text(actionTypeDescription)
                 .font(.caption)
@@ -94,24 +188,28 @@ struct ActionEditorView: View {
             return "Runs a shell command in the background."
         case .openApp:
             return "Opens an app and pastes the text."
+        case .revealInFinder:
+            return "Reveals copied files in Finder."
+        case .openFile:
+            return "Opens the copied file with its default app."
+        case .copyToClipboard:
+            return "Copies processed text to the clipboard."
+        case .saveImage:
+            return "Saves clipboard image as PNG."
+        case .saveTempFile:
+            return "Saves text to a temporary file and opens it."
+        case .stripANSI:
+            return "Removes ANSI color codes from terminal output."
         }
     }
 
-    private var templateSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+    private var templateEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(templateLabel)
-                    .font(.subheadline.weight(.medium))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
                 Spacer()
-                Button {
-                    if let url = URL(string: "https://github.com/anthropics/claude-code/wiki/CopyCopy-Action-Templates") {
-                        NSWorkspace.shared.open(url)
-                    }
-                } label: {
-                    Label("View Examples", systemImage: "arrow.up.right.square")
-                        .font(.caption)
-                }
-                .buttonStyle(.link)
             }
 
             if action.actionType == .openApp {
@@ -120,51 +218,16 @@ struct ActionEditorView: View {
 
             TextEditor(text: $action.template)
                 .font(.system(.body, design: .monospaced))
-                .frame(minHeight: 140, maxHeight: 300)
+                .frame(minHeight: 80, maxHeight: 160)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
                 )
 
-            examplesSection
+            quickExamples
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Available variables:")
-                    .font(.caption.weight(.medium))
-                variablesHelp
-            }
-            .foregroundStyle(.tertiary)
+            variablesHelp
         }
-    }
-
-    private var examplesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Quick examples:")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 8) {
-                exampleButton("Google Search", template: "https://www.google.com/search?q={text:encoded}")
-                exampleButton("Translate", template: "https://translate.google.com/?text={text:encoded}")
-                exampleButton("ChatGPT Prompt", template: "Summarize this: {text}")
-            }
-        }
-    }
-
-    private func exampleButton(_ title: String, template: String) -> some View {
-        Button {
-            action.template = template
-            if template.hasPrefix("http") {
-                action.actionType = .openURL
-            } else {
-                action.actionType = .openApp
-            }
-        } label: {
-            Text(title)
-                .font(.caption)
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
     }
 
     private var templateLabel: String {
@@ -172,6 +235,9 @@ struct ActionEditorView: View {
         case .openURL: return "URL Template"
         case .shellCommand: return "Command"
         case .openApp: return "Text to Paste"
+        case .copyToClipboard: return "Text Template"
+        case .revealInFinder, .openFile, .saveImage, .saveTempFile, .stripANSI:
+            return "Template"
         }
     }
 
@@ -179,14 +245,17 @@ struct ActionEditorView: View {
     private var appPicker: some View {
         HStack {
             Text("App:")
-                .font(.subheadline)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Picker("App", selection: appBinding) {
                 Text("ChatGPT").tag("ChatGPT")
                 Text("Claude").tag("Claude")
-                Text("Other (specify in template)").tag("Other")
+                Text("Other").tag("Other")
             }
-            .pickerStyle(.menu)
+            .pickerStyle(.segmented)
             .labelsHidden()
+            .controlSize(.small)
+            Spacer()
         }
     }
 
@@ -204,58 +273,65 @@ struct ActionEditorView: View {
         )
     }
 
+    private var quickExamples: some View {
+        HStack(spacing: 6) {
+            Text("Examples:")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+
+            Button("Google Search") {
+                action.template = "https://www.google.com/search?q={text:encoded}"
+                action.actionType = .openURL
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+
+            Button("Translate") {
+                action.template = "https://translate.google.com/?text={text:encoded}"
+                action.actionType = .openURL
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+
+            Button("ChatGPT") {
+                action.template = "Summarize: {text}"
+                action.actionType = .openApp
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+
+            Spacer()
+        }
+    }
+
     private var variablesHelp: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("{text} - The copied text")
-            Text("{text:encoded} - URL-encoded text")
-            Text("{text:trimmed} - Trimmed whitespace")
-            Text("{charcount} - Character count")
-            Text("{linecount} - Line count")
-        }
-        .font(.caption)
-    }
-
-    private var filterSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Show for Content Type")
-                .font(.subheadline.weight(.medium))
-            Picker("Filter", selection: $action.contentFilter) {
-                ForEach(ContentTypeFilter.allCases) { filter in
-                    Text(filter.displayName).tag(filter)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            Text("Only show this action when the clipboard contains this type of content.")
+        HStack(spacing: 16) {
+            Text("Variables:")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
-        }
-    }
 
-    private var iconSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Icon")
-                .font(.subheadline.weight(.medium))
-            HStack(spacing: 12) {
-                Image(systemName: action.systemImage)
-                    .font(.title2)
-                    .frame(width: 32, height: 32)
-                    .background(.quaternary)
-                    .cornerRadius(6)
-
-                TextField("SF Symbol name", text: $action.systemImage)
-                    .textFieldStyle(.roundedBorder)
+            Group {
+                Text("{text}")
+                Text("{text:encoded}")
+                Text("{text:trimmed}")
+                Text("{charcount}")
+                Text("{linecount}")
             }
-            Text("Enter an SF Symbol name (e.g., star, sparkles, globe).")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            .font(.caption.monospaced())
+            .foregroundStyle(.tertiary)
+
+            Spacer()
         }
     }
+
+    // MARK: - Enabled Section
 
     private var enabledSection: some View {
         Toggle("Enabled", isOn: $action.isEnabled)
             .toggleStyle(.checkbox)
     }
+
+    // MARK: - Footer
 
     private var footer: some View {
         HStack {
@@ -267,6 +343,7 @@ struct ActionEditorView: View {
             Spacer()
 
             Button("Save") {
+                action.systemImage = action.actionType.systemImage
                 onSave(action)
             }
             .keyboardShortcut(.return)

@@ -15,7 +15,6 @@ final class AppModel: ObservableObject {
     private let copyEventTap = CopyEventTap()
     private let pasteboardMonitor = PasteboardMonitor()
     private let classifier = ClipboardClassifier()
-    private let suggestionEngine = SuggestionEngine()
 
     private var lastCopyKeyEvent: CopyKeyEvent?
     private var lastTriggerTimestamp: TimeInterval?
@@ -153,25 +152,23 @@ final class AppModel: ObservableObject {
             suggestedActions = []
             return
         }
-        var actions = suggestionEngine.suggestions(for: ctx)
 
-        let enabledCustomActions = actionsStore.enabledActions(for: ctx.snapshot.kind)
-        for customAction in enabledCustomActions {
+        let sourceContext = ctx.sourceAppContext
+        let entity = ctx.snapshot.detectedEntity
+        let enabledActions = actionsStore.enabledActions(for: ctx.snapshot.kind, sourceContext: sourceContext, entity: entity)
+
+        suggestedActions = enabledActions.map { customAction in
             let actionCopy = customAction
             let contextCopy = ctx
             let storeCopy = actionsStore
-            actions.append(
-                SuggestedAction(
-                    title: actionCopy.name,
-                    subtitle: actionCopy.actionType.displayName,
-                    systemImage: actionCopy.systemImage
-                ) {
-                    storeCopy.execute(actionCopy, with: contextCopy)
-                }
-            )
+            return SuggestedAction(
+                title: actionCopy.name,
+                subtitle: actionCopy.actionType.displayName,
+                systemImage: actionCopy.systemImage
+            ) {
+                storeCopy.execute(actionCopy, with: contextCopy)
+            }
         }
-
-        suggestedActions = actions
     }
 
     func showAbout() {
