@@ -33,24 +33,8 @@ final class ClipboardClassifier {
             )
         }
 
-        if pasteboard.data(forType: .rtf) != nil {
-            return ClipboardSnapshot(
-                changeCount: changeCount,
-                kind: .richText,
-                summary: "Rich text (RTF)",
-                richTextType: .rtf
-            )
-        }
-
-        if pasteboard.data(forType: .html) != nil {
-            return ClipboardSnapshot(
-                changeCount: changeCount,
-                kind: .richText,
-                summary: "Rich text (HTML)",
-                richTextType: .html
-            )
-        }
-
+        // Check plain text FIRST - many apps put both RTF and plain text on clipboard
+        // We prefer plain text to preserve code, JSON, etc.
         if let text = pasteboard.string(forType: .string), !text.isEmpty {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
 

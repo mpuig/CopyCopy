@@ -279,7 +279,7 @@ struct ActionEditorView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
 
-            Button("Google Search") {
+            Button("Google") {
                 action.template = "https://www.google.com/search?q={text:encoded}"
                 action.actionType = .openURL
             }
@@ -300,25 +300,27 @@ struct ActionEditorView: View {
             .buttonStyle(.bordered)
             .controlSize(.mini)
 
+            Button("Summarize") {
+                action.template = "npx -y @steipete/summarize \"{text}\""
+                action.actionType = .shellCommand
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+
             Spacer()
         }
     }
 
     private var variablesHelp: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 4) {
             Text("Variables:")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
 
-            Group {
-                Text("{text}")
-                Text("{text:encoded}")
-                Text("{text:trimmed}")
-                Text("{charcount}")
-                Text("{linecount}")
-            }
-            .font(.caption.monospaced())
-            .foregroundStyle(.tertiary)
+            Text("{text}  {text:encoded}  {text:trimmed}  {charcount}  {linecount}")
+                .font(.caption.monospaced())
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: true, vertical: false)
 
             Spacer()
         }
