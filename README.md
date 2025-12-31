@@ -42,6 +42,9 @@ xattr -cr dist/CopyCopy.app
 open dist/CopyCopy.app
 ```
 
+### Releasing (maintainers)
+See `docs/releasing.md`.
+
 ## Usage
 
 1. Copy something with **⌘C**
