@@ -15,15 +15,30 @@ A native macOS 14+ menu bar utility that shows contextual actions when you press
 **Requirements:** macOS 14+ (Sonoma) • Apple Silicon & Intel
 
 ### Download Release
-1. Download from [GitHub Releases](https://github.com/mpuig/copycopy/releases)
-2. Move `CopyCopy.app` to `/Applications`
-3. Open it (first run: right-click → Open)
+1. Download the latest release from [GitHub Releases](https://github.com/mpuig/copycopy/releases)
+2. Unzip the downloaded file
+3. Open Terminal and run:
+   ```bash
+   # Remove quarantine attribute (bypasses Gatekeeper)
+   xattr -cr ~/Downloads/CopyCopy.app
+
+   # Move to Applications
+   mv ~/Downloads/CopyCopy.app /Applications/
+
+   # Open the app
+   open /Applications/CopyCopy.app
+   ```
 4. Grant Accessibility permission when prompted
+
+**Alternatively:** Right-click `CopyCopy.app` → Open → Open (bypasses Gatekeeper for one-time use)
 
 ### Build from Source
 ```bash
 git clone https://github.com/mpuig/copycopy.git
 cd copycopy && ./build.sh
+
+# Bypass Gatekeeper for first run
+xattr -cr dist/CopyCopy.app
 open dist/CopyCopy.app
 ```
 
@@ -71,8 +86,13 @@ CopyCopy includes built-in actions for common tasks. Some use special action typ
 
 CopyCopy needs **Accessibility** permission to detect ⌘C:
 
-1. System Settings → Privacy & Security → Accessibility → enable **CopyCopy**
-2. If needed, also enable Input Monitoring
+1. **Open System Settings**
+2. Go to **Privacy & Security** → **Accessibility**
+3. Click the **+** button and add **CopyCopy** from `/Applications/`
+4. Toggle the switch to enable it
+5. If the double ⌘C still doesn't work, also enable **Input Monitoring** in the same section
+
+**Note:** If you see the menu bar icon with a slash icon (🔒), permissions aren't granted yet.
 
 ## Architecture
 
@@ -95,6 +115,27 @@ Sources/
 ## License
 
 MIT
+
+## Troubleshooting
+
+**App won't open (Gatekeeper warning)**
+```bash
+xattr -cr /Applications/CopyCopy.app
+open /Applications/CopyCopy.app
+```
+
+**Double ⌘C doesn't trigger**
+- Check menu bar icon: if it shows 🔒 (slash), Accessibility isn't granted
+- Go to System Settings → Privacy & Security → Accessibility → enable CopyCopy
+- Restart the app after enabling permissions
+
+**Settings window won't open**
+- Press ⌘, when the menu is open to open Settings
+- Or right-click menu bar icon and select Settings
+
+**Actions not showing**
+- Verify content type matches your action filters
+- Check Debug tab in Settings for clipboard state
 
 ## Links
 

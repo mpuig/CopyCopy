@@ -92,12 +92,32 @@ chmod -R u+w "$APP_DIR"
 xattr -cr "$APP_DIR" 2>/dev/null || true
 find "$APP_DIR" -name '._*' -delete 2>/dev/null || true
 
-# Sign (optional): set APP_IDENTITY to a Developer ID identity string.
+ # Sign (optional): set APP_IDENTITY to a Developer ID identity string.
 if [[ -n "${APP_IDENTITY:-}" ]]; then
   codesign --force --deep --timestamp --options runtime --sign "$APP_IDENTITY" "$APP_DIR"
+  echo "✅ Signed with: $APP_IDENTITY"
+
+  # Notarize (requires APP_IDENTITY and APP_PASSWORD set)
+  if [[ -n "${APP_PASSWORD:-}" && -n "${APPLE_ID:-}" ]]; then
+    echo "📤 Uploading for notarization..."
+    OUTPUT=$(xcrun notarytool submit "$APP_DIR" \
+      --apple-id "$APPLE_ID" \
+      --password "$APP_PASSWORD" \
+      --team-id "$TEAM_ID" \
+      --wait 2>&1 | tee /dev/tty)
+
+    REQUEST_ID=$(echo "$OUTPUT" | grep -oE 'id: [0-9a-f-]+' | cut -d' ' -f2)
+
+    if [[ -n "$REQUEST_ID" ]]; then
+      echo "📎 Notarization complete (ID: $REQUEST_ID)"
+      xcrun stapler staple "$APP_DIR"
+      echo "✅ Stapled notarization ticket"
+    fi
+  fi
 else
   # Ad-hoc signing helps diagnostics but won't satisfy Gatekeeper for downloaded apps.
   codesign --force --deep --sign - "$APP_DIR" >/dev/null 2>&1 || true
+  echo "⚠️  Ad-hoc signed (won't pass Gatekeeper - right-click Open to bypass)"
 fi
 
 echo ""
