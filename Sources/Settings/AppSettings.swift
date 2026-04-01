@@ -11,12 +11,6 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    @Published var openPopoverOnDoubleCopy: Bool {
-        didSet {
-            UserDefaults.standard.set(openPopoverOnDoubleCopy, forKey: "openPopoverOnDoubleCopy")
-        }
-    }
-
     @Published var debugMenuEnabled: Bool {
         didSet {
             UserDefaults.standard.set(debugMenuEnabled, forKey: "debugMenuEnabled")
@@ -55,7 +49,6 @@ final class AppSettings: ObservableObject {
 
     init() {
         self.launchAtLogin = UserDefaults.standard.bool(forKey: "launchAtLogin")
-        self.openPopoverOnDoubleCopy = UserDefaults.standard.object(forKey: "openPopoverOnDoubleCopy") as? Bool ?? true
         self.debugMenuEnabled = UserDefaults.standard.bool(forKey: "debugMenuEnabled")
 
         let stored = UserDefaults.standard.double(forKey: "doubleCopyThresholdMs")

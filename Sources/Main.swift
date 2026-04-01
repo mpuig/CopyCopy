@@ -9,37 +9,43 @@ struct CopyCopyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model: AppModel
     @StateObject private var settings: AppSettings
-    @StateObject private var actionsStore: CustomActionsStore
     @State private var isMenuPresented = false
     @State private var statusItem: NSStatusItem?
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let settings = AppSettings()
         let actionsStore = CustomActionsStore()
         let model = AppModel(settings: settings, actionsStore: actionsStore)
         _settings = StateObject(wrappedValue: settings)
-        _actionsStore = StateObject(wrappedValue: actionsStore)
         _model = StateObject(wrappedValue: model)
     }
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContentView(model: model, settings: settings, actionsStore: actionsStore, updater: appDelegate.updaterController)
+            MenuContentView(model: model, settings: settings, updater: appDelegate.updaterController)
         } label: {
             StatusItemLabel(model: model)
         }
         .menuBarExtraAccess(isPresented: $isMenuPresented) { item in
             statusItem = item
         }
+        .onChange(of: isMenuPresented) { _, isPresented in
+            if isPresented {
+                model.refreshRuntimeAccessStatus()
+            }
+        }
         .onChange(of: model.triggerPulseID) { _, _ in
             pulseStatusItem()
-            if settings.openPopoverOnDoubleCopy {
-                isMenuPresented = true
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                model.refreshRuntimeAccessStatus()
             }
         }
 
         Settings {
-            SettingsView(settings: settings, model: model, actionsStore: actionsStore, updater: appDelegate.updaterController)
+            SettingsView(settings: settings, model: model, updater: appDelegate.updaterController)
         }
     }
 

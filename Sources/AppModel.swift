@@ -5,23 +5,25 @@ import Combine
 final class AppModel: ObservableObject {
     @Published var statusText: String = "Double ⌘C to show actions."
     @Published var hasAccessibilityPermission: Bool = false
+    @Published var isEventTapRunning: Bool = false
     @Published var lastClipboardContext: ClipboardContext?
     @Published var suggestedActions: [SuggestedAction] = []
     @Published var triggerPulseID: UUID = UUID()
-    @Published var isLLMLoading: Bool = false
 
     private let settings: AppSettings
     private let actionsStore: CustomActionsStore
+    private let skillLoader = SkillLoader()
+    private let actionExecutor = ToolExecutor()
     private let permissions = PermissionsManager()
     private let copyEventTap = CopyEventTap()
     private let pasteboardMonitor = PasteboardMonitor()
     private let classifier = ClipboardClassifier()
-    private let llmSuggester = LLMActionSuggester()
 
     private var lastCopyKeyEvent: CopyKeyEvent?
     private var lastTriggerTimestamp: TimeInterval?
     private var pendingShowRequestID: UUID?
     private var cancellables = Set<AnyCancellable>()
+    private var floatingPanel: FloatingActionPanel?
 
     private enum Constants {
         /// First clipboard capture attempt delay (80ms) - Quick initial check to capture immediately available content
@@ -31,6 +33,7 @@ final class AppModel: ObservableObject {
         /// Menu trigger delay (120ms) - Ensures clipboard capture completes before showing UI to prevent race conditions
         static let menuTriggerDelay: UInt64 = 120_000_000
         static let copyEventWindowSeconds: TimeInterval = 1.0
+        static let permissionRefreshInterval: TimeInterval = 1.5
     }
 
     init(settings: AppSettings, actionsStore: CustomActionsStore) {
@@ -42,6 +45,15 @@ final class AppModel: ObservableObject {
         settings.$doubleCopyThresholdMs
             .sink { [weak self] newValue in
                 self?.copyEventTap.doublePressThreshold = newValue / 1000.0
+            }
+            .store(in: &cancellables)
+
+        Timer.publish(every: Constants.permissionRefreshInterval, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                guard !self.hasAccessibilityPermission || !self.isEventTapRunning else { return }
+                self.refreshPermissions(promptIfNeeded: false)
             }
             .store(in: &cancellables)
     }
@@ -89,10 +101,12 @@ final class AppModel: ObservableObject {
         Logger.info("Accessibility permission: \(hasAccessibilityPermission)", category: .permissions)
         if hasAccessibilityPermission {
             let started = copyEventTap.start()
+            isEventTapRunning = started && copyEventTap.isRunning
             Logger.info("Event tap start result: \(started)", category: .permissions)
         } else {
             Logger.info("No permission, stopping event tap", category: .permissions)
             copyEventTap.stop()
+            isEventTapRunning = false
         }
     }
 
@@ -106,9 +120,15 @@ final class AppModel: ObservableObject {
 
     private func startEventTapIfPossible() {
         guard hasAccessibilityPermission else { return }
-        if !copyEventTap.start() {
+        let started = copyEventTap.start()
+        isEventTapRunning = started && copyEventTap.isRunning
+        if !started {
             statusText = "Could not start event tap. Check Accessibility / Input Monitoring."
         }
+    }
+
+    func refreshRuntimeAccessStatus() {
+        refreshPermissions(promptIfNeeded: false)
     }
 
     private func beginTriggerFlow(copyEvent: CopyKeyEvent) {
@@ -131,7 +151,7 @@ final class AppModel: ObservableObject {
     }
 
     private func requestShowActions(copyEvent: CopyKeyEvent) {
-        Logger.info("requestShowActions called from \(copyEvent.appName)", category: .clipboard)
+        Logger.info("[AppModel] requestShowActions called from \(copyEvent.appName)", category: .clipboard)
         let requestID = UUID()
         pendingShowRequestID = requestID
         beginTriggerFlow(copyEvent: copyEvent)
@@ -140,11 +160,20 @@ final class AppModel: ObservableObject {
             guard let self else { return }
             try? await Task.sleep(nanoseconds: Constants.menuTriggerDelay)
             guard self.pendingShowRequestID == requestID else {
-                Logger.info("Request cancelled (new request came in)", category: .clipboard)
+                Logger.info("[AppModel] Request cancelled (new request came in)", category: .clipboard)
                 return
             }
-            Logger.info("Triggering pulse animation", category: .clipboard)
-            self.triggerPulseID = UUID()
+            Logger.info("[AppModel] Showing floating panel", category: .clipboard)
+            
+            // Close any existing panel
+            self.floatingPanel?.close()
+            
+            // Create and show the floating panel
+            if let context = self.lastClipboardContext {
+                let panel = FloatingActionPanel(context: context, actions: self.suggestedActions)
+                self.floatingPanel = panel
+                panel.show()
+            }
         }
     }
 
@@ -174,52 +203,14 @@ final class AppModel: ObservableObject {
 
         let sourceContext = ctx.sourceAppContext
         let entity = ctx.snapshot.detectedEntity
-        let enabledActions = actionsStore.enabledActions(for: ctx.snapshot.kind, sourceContext: sourceContext, entity: entity)
 
-        var actions: [SuggestedAction] = enabledActions.map { customAction in
-            let actionCopy = customAction
-            let contextCopy = ctx
-            let storeCopy = actionsStore
-            return SuggestedAction(
-                title: actionCopy.name,
-                subtitle: actionCopy.actionType.displayName,
-                systemImage: actionCopy.systemImage
-            ) {
-                storeCopy.execute(actionCopy, with: contextCopy)
-            }
-        }
-
-        // Add LLM-powered suggestions if enabled
-        if settings.llmEnabled {
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.isLLMLoading = true
-                
-                let llmSuggestions: [LLMSuggestedAction]
-                if self.settings.useLocalLLM {
-                    // Use local LLM
-                    llmSuggestions = (try? await LocalLLMService.shared.suggestActions(clipboardContext: ctx)) ?? []
-                } else {
-                    // Use cloud LLM via HuggingFace
-                    llmSuggestions = await self.llmSuggester.suggestActions(
-                        for: ctx,
-                        apiKey: self.settings.llmApiKey,
-                        enabled: self.settings.llmEnabled
-                    )
-                }
-                
-                if !llmSuggestions.isEmpty {
-                    let llmActions = self.llmSuggester.convertToSuggestedActions(
-                        llmSuggestions: llmSuggestions,
-                        context: ctx
-                    )
-                    actions.insert(contentsOf: llmActions, at: 0)
-                    self.suggestedActions = actions
-                }
-                
-                self.isLLMLoading = false
-            }
-        }
+        var actions = skillLoader.matchingActions(
+            for: ctx.snapshot.kind,
+            sourceContext: sourceContext,
+            entity: entity,
+            context: ctx,
+            executor: actionExecutor
+        )
 
         suggestedActions = actions
     }
@@ -230,6 +221,7 @@ final class AppModel: ObservableObject {
 
     var menuBarSymbolName: String {
         guard hasAccessibilityPermission else { return "lock.slash" }
+        guard isEventTapRunning else { return "exclamationmark.triangle" }
         guard let kind = lastClipboardContext?.snapshot.kind else { return "doc.on.doc" }
 
         switch kind {
@@ -239,6 +231,24 @@ final class AppModel: ObservableObject {
         case .plainText: return "text.quote"
         case .richText: return "doc.richtext"
         case .unknown: return "questionmark.folder"
+        }
+    }
+
+    var permissionPromptTitle: String? {
+        if !hasAccessibilityPermission {
+            return "Grant Accessibility Permission…"
+        }
+        if !isEventTapRunning {
+            return "Grant Input Monitoring Permission…"
+        }
+        return nil
+    }
+
+    func resolvePermissionPromptAction() {
+        if !hasAccessibilityPermission {
+            openAccessibilitySettings()
+        } else if !isEventTapRunning {
+            openInputMonitoringSettings()
         }
     }
 }

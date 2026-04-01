@@ -94,7 +94,7 @@ struct SettingsAboutPane: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text("© 2025. MIT License.")
+            Text("© 2026. MIT License.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)

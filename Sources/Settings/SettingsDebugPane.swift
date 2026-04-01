@@ -15,8 +15,10 @@ struct SettingsDebugPane: View {
                 {
                     VStack(alignment: .leading, spacing: 8) {
                         statusRow("Accessibility Permission", value: model.hasAccessibilityPermission ? "✅ Granted" : "❌ Not granted")
-                        statusRow("Event Tap", value: model.hasAccessibilityPermission ? "✅ Running" : "❌ Stopped")
-                        statusRow("Open on Double ⌘C", value: settings.openPopoverOnDoubleCopy ? "Enabled" : "Disabled")
+                        statusRow("Event Tap", value: model.isEventTapRunning ? "✅ Running" : "❌ Stopped")
+                        if model.hasAccessibilityPermission && !model.isEventTapRunning {
+                            statusRow("Likely Missing", value: "Input Monitoring")
+                        }
                         statusRow("Double-copy Threshold", value: "\(Int(settings.doubleCopyThresholdMs))ms")
                     }
                 }

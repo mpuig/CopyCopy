@@ -8,7 +8,7 @@ final class SettingsWindowController {
 
     private init() {}
 
-    func show(settings: AppSettings, model: AppModel, actionsStore: CustomActionsStore, updater: UpdaterProviding) {
+    func show(settings: AppSettings, model: AppModel, updater: UpdaterProviding) {
         if let existingWindow = window, existingWindow.isVisible {
             existingWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -18,7 +18,6 @@ final class SettingsWindowController {
         let settingsView = SettingsView(
             settings: settings,
             model: model,
-            actionsStore: actionsStore,
             updater: updater
         )
 

@@ -119,101 +119,19 @@ final class LocalLLMService: ObservableObject {
         let truncatedText = text.count > 3000 
             ? String(text.prefix(3000)) + "\n\n[Content truncated]"
             : text
-        
-        let prompt = """
-        Please summarize the following text. Use a professional, objective tone. Structure the response with an Executive Summary (2 sentences), followed by a bulleted list of the top 5 key takeaways, and finally a 'Next Steps' section if applicable.
-        
-        Text to summarize:
-        \(truncatedText)
-        """
-        
+
         return try await generate(
-            prompt: prompt,
-            systemPrompt: "You are a professional summarization assistant. Create structured, professional summaries.",
+            prompt: truncatedText,
+            systemPrompt: "Summarize the clipboard text into a short, clear summary. Preserve the main point and the most important supporting details. Omit repetition, filler, and minor examples. Use a neutral professional tone. Default to 3-5 bullet points. If the source is very short, return a single sentence. Do not add headings, commentary, or information not present in the source.",
             temperature: 0.3,
-            maxTokens: 800
+            maxTokens: 500
         )
     }
     
-    func suggestActions(clipboardContext: ClipboardContext) async throws -> [LLMSuggestedAction] {
-        let snapshot = clipboardContext.snapshot
-        
-        var contextDescription = ""
-        if let text = snapshot.plainText {
-            let truncated = text.count > 800 ? String(text.prefix(800)) + "..." : text
-            contextDescription += "Text: \(truncated)\n"
-        }
-        if snapshot.detectedEntity != .none {
-            contextDescription += "Type: \(snapshot.detectedEntity.displayName)\n"
-        }
-        
-        let prompt = """
-        Based on this clipboard content, suggest 2-3 useful actions:
-        
-        \(contextDescription)
-        
-        Respond with ONLY a JSON array in this format:
-        [
-          {
-            "name": "Action Name",
-            "description": "Brief description",
-            "actionType": "openURL|shellCommand|openApp|copyToClipboard",
-            "template": "template with {text} variables",
-            "confidence": 0.9,
-            "reason": "Why this is useful"
-          }
-        ]
-        """
-        
-        let response = try await generate(
-            prompt: prompt,
-            systemPrompt: "You are an intelligent assistant that suggests useful actions based on clipboard content.",
-            temperature: 0.3,
-            maxTokens: 600
-        )
-        
-        // Parse JSON response
-        guard let jsonStart = response.range(of: "[")?.lowerBound,
-              let jsonEnd = response.range(of: "]", range: jsonStart..<response.endIndex)?.upperBound else {
-            return []
-        }
-        
-        let jsonString = String(response[jsonStart..<jsonEnd])
-        guard let data = jsonString.data(using: .utf8) else {
-            return []
-        }
-        
-        do {
-            let dtos = try JSONDecoder().decode([LLMSuggestedActionDTO].self, from: data)
-            return dtos.map { dto in
-                LLMSuggestedAction(
-                    name: dto.name,
-                    description: dto.description,
-                    actionType: dto.actionType,
-                    template: dto.template,
-                    confidence: dto.confidence,
-                    reason: dto.reason
-                )
-            }
-        } catch {
-            Logger.error("Failed to parse local LLM suggestions: \(error)", category: .general)
-            return []
-        }
-    }
 }
 
 enum LocalLLMError: Error {
     case modelNotLoaded
     case generationFailed(Error)
     case invalidResponse
-}
-
-// DTO for JSON parsing
-private struct LLMSuggestedActionDTO: Codable {
-    let name: String
-    let description: String
-    let actionType: String
-    let template: String
-    let confidence: Double
-    let reason: String
 }

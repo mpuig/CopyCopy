@@ -4,7 +4,7 @@ This file provides context for AI assistants working on CopyCopy.
 
 ## Project overview
 
-CopyCopy is a macOS menu bar utility that shows contextual actions when you press ⌘C twice quickly. It monitors the clipboard and provides actions based on the content type (URLs, text, files, images).
+CopyCopy is a macOS menu bar utility that shows contextual actions when you press ⌘C twice quickly. It monitors the clipboard, classifies the current pasteboard contents, and suggests actions from built-in or custom skills.
 
 - Language: Swift
 - UI framework: SwiftUI
@@ -15,79 +15,77 @@ CopyCopy is a macOS menu bar utility that shows contextual actions when you pres
 
 ```
 Sources/
-├── Main.swift              # App entry point, MenuBarExtra setup
-├── AppModel.swift          # Core app state and clipboard monitoring
-├── AppDelegate.swift       # NSApplicationDelegate
-├── PermissionsManager.swift # Accessibility permission handling
-├── StatusBarController.swift # Menu bar icon controller
+├── Main.swift                   # App entry point, MenuBarExtra setup
+├── AppModel.swift               # Core app state, clipboard monitoring, suggestion refresh
+├── AppDelegate.swift            # NSApplicationDelegate
+├── PermissionsManager.swift     # Accessibility/Input Monitoring settings links
 ├── Actions/
-│   ├── CustomAction.swift      # Action model with types and filters
-│   └── CustomActionsStore.swift # Action storage and execution
+│   ├── CustomAction.swift       # Legacy custom action model and filters
+│   └── CustomActionsStore.swift # Legacy custom action storage and execution
 ├── Clipboard/
-│   ├── ClipboardClassifier.swift # Content type detection
+│   ├── ClipboardClassifier.swift # Content and entity detection
 │   ├── ClipboardModels.swift     # Snapshot and context types
 │   ├── CopyEventTap.swift        # Double-copy detection via CGEventTap
 │   └── PasteboardMonitor.swift   # Clipboard change monitoring
+├── LLM/
+│   ├── LLMService.swift         # Remote/local summarization facade
+│   └── LocalLLMService.swift    # On-device LFM 2.5 model loading and inference
 ├── Settings/
-│   ├── SettingsView.swift          # Main settings window
-│   ├── SettingsWindowController.swift # Manual NSWindow management
-│   ├── SettingsActionsPane.swift   # Actions list UI
-│   ├── ActionEditorView.swift      # Action editor form
-│   └── ActionEditorWindowController.swift
+│   ├── SettingsView.swift
+│   ├── SettingsGeneralPane.swift
+│   ├── SettingsDebugPane.swift
+│   └── ...
+├── Skills/
+│   ├── BuiltInSkills.swift      # Bundled skill sources
+│   ├── Skill.swift              # Parsed skill model
+│   ├── SkillLoader.swift        # Built-in export + runtime loading
+│   ├── SkillMarkdownFormatter.swift # Readable export formatter
+│   ├── SkillParser.swift        # `## Tools` JSON parser + legacy fallback
+│   ├── ToolDefinition.swift     # Tool schema data models
+│   ├── ToolExecutor.swift       # Safe execution dispatch
+│   └── ToolValidator.swift      # URL, host, path, and schema validation
 ├── Suggestions/
-│   ├── SuggestedAction.swift  # Action model for menu display
-│   └── SuggestionEngine.swift # (Legacy, being replaced)
+│   └── SuggestedAction.swift    # Action model for menu display
 └── UI/
-    ├── MenuContentView.swift   # Menu popup content
-    └── AboutPresenter.swift    # About window
+    ├── MenuContentView.swift    # Menu popup content
+    └── FloatingActionPanel.swift # Triggered action picker UI
 ```
 
 ## Key concepts
 
-### Action types
+### Skills and tools
 
-Actions can be one of:
-- `openURL`: Opens a URL template in the browser
-- `shellCommand`: Runs a shell command
-- `openApp`: Opens an app and pastes text
-- `revealInFinder`: Shows files in Finder
-- `openFile`: Opens a file with its default app
-- `copyToClipboard`: Copies processed text
-- `saveImage`: Saves clipboard image as PNG
-- `saveTempFile`: Creates and opens a temp file
-- `stripANSI`: Removes terminal color codes
+Built-in behavior now comes from skills, not ad-hoc built-in actions.
 
-### Template variables
+- Built-in skills are authored in `BuiltInSkills.swift`.
+- The canonical bundled format is Markdown with a `## Tools` fenced JSON block.
+- At runtime, `SkillParser` decodes the tool schema into `ToolDefinition`.
+- `ToolExecutor` dispatches only fixed safe operations from `ExecuteFunction`.
+- Built-in skills are exported to `~/.copycopy/skills/<id>/SKILL.md` in a readable legacy `## Actions` format.
+- The parser still accepts the older `## Actions` key/value format for compatibility.
 
-Actions use these placeholders:
-- `{text}` - Clipboard text
-- `{text:encoded}` - URL-encoded text
-- `{text:trimmed}` - Whitespace-trimmed text
-- `{path}` - File path (for file content)
-- `{charcount}` - Character count
-- `{linecount}` - Line count
+### Execute functions
 
-### Content filters
+Safe built-in tool execution currently includes:
 
-Actions can be filtered by clipboard content:
-- `any` - All content types
-- `text` - Plain or rich text
-- `url` - URLs
-- `image` - Images
-- `files` - File URLs
+- `openURL`, `openURLTemplate`, `openStaticURL`
+- `openApp`
+- `openFile`, `revealInFinder`, `saveImage`, `saveTempFile`, `copyToClipboard`
+- `formatJSON`, `decodeBase64`, `decodeURL`, `stripANSI`, `htmlToMarkdown`
+- `revealPath`, `openInTerminal`, `ping`
+- `llmPrompt`, `summarize`
 
-### Source context filters
+### Legacy custom actions
 
-Actions can be filtered by source app type:
-- `any` - All apps
-- `browser` - Web browsers
-- `ide` - Code editors
-- `terminal` - Terminal apps
+The app still includes a separate custom action editor and `CustomActionsStore`. That path is legacy and user-facing; it is no longer the source of built-in suggestions.
 
 ## Build commands
 
 ```bash
-# Build release app bundle
+# Build release app bundle with MLX resources
+./build_xcode.sh
+
+# SwiftPM bundle build
 ./build.sh
 
 # Development loop: build and run
@@ -98,25 +96,33 @@ swift build
 .build/debug/CopyCopy
 ```
 
+Use `./build_xcode.sh` when you need the packaged app with the on-device model. The plain SwiftPM-produced app bundle does not include the MLX Metal runtime correctly.
+
 ## Dependencies
 
 - [MenuBarExtraAccess](https://github.com/orchetect/MenuBarExtraAccess) - Access to NSStatusItem from SwiftUI MenuBarExtra
 
 ## Common tasks
 
-### Adding a new built-in action
+### Adding a new built-in skill tool
 
-1. Add the action to `CustomAction.defaultActions` in `CustomAction.swift`
-2. Use a fixed UUID (format: `00000000-0000-0000-0000-00000000XXXX`)
-3. Set `isBuiltIn: true`
+1. Edit the relevant skill in `Sources/Skills/BuiltInSkills.swift`.
+2. Add or update a tool entry in the `## Tools` JSON block.
+3. Use an `execute` value backed by `ExecuteFunction`.
+4. Add any new validation in `ToolValidator` and execution logic in `ToolExecutor` if needed.
+5. Keep the exported Markdown form readable; `SkillMarkdownFormatter` handles export.
 
-### Adding a new action type
+### Adding a new execute function
 
-1. Add the case to `ActionType` enum in `CustomAction.swift`
-2. Update `displayName`, `systemImage`, and `requiresTemplate` properties
-3. Add execution logic in `CustomActionsStore.execute()`
-4. Update `ActionEditorView.actionTypeDescription`
+1. Add the case to `ExecuteFunction.swift`.
+2. Validate schema or parameter expectations in `ToolValidator.swift`.
+3. Implement execution in `ToolExecutor.swift`.
+4. Update `SkillParser` validation if the new function has special requirements.
 
 ### Testing clipboard detection
 
-The Debug tab in Settings shows current clipboard state and recent events.
+The Debug tab in Settings shows clipboard state, Accessibility permission, and event-tap health. Enable it with:
+
+```bash
+defaults write com.copycopy.app debugMenuEnabled -bool true
+```

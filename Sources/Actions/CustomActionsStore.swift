@@ -98,7 +98,12 @@ final class CustomActionsStore: ObservableObject {
         }
     }
 
-    func execute(_ action: CustomAction, with context: ClipboardContext) {
+    /// Completion passed back after an action finishes.
+    /// - `text`: human-readable result description
+    /// - `isInClipboard`: whether the result was placed on the pasteboard
+    typealias ActionCompletion = (_ text: String, _ isInClipboard: Bool) -> Void
+
+    func execute(_ action: CustomAction, with context: ClipboardContext, completion: ActionCompletion? = nil) {
         let text = context.snapshot.plainText ?? context.snapshot.url?.absoluteString ?? ""
         let shouldEscape = action.actionType == .shellCommand
         var processedTemplate = action.processTemplate(with: text, shouldEscapeForShell: shouldEscape)
@@ -115,26 +120,34 @@ final class CustomActionsStore: ObservableObject {
         switch action.actionType {
         case .openURL:
             executeOpenURL(processedTemplate)
+            completion?("Opened URL", false)
         case .shellCommand:
-            executeShellCommand(processedTemplate)
+            executeShellCommand(processedTemplate, completion: completion)
         case .openApp:
             executeOpenApp(action, processedText: processedTemplate)
+            completion?("Opened \(extractAppName(from: action.template) ?? "app")", false)
         case .revealInFinder:
             executeRevealInFinder(context)
+            completion?("Revealed in Finder", false)
         case .openFile:
             executeOpenFile(context)
+            completion?("Opened file", false)
         case .copyToClipboard:
             executeCopyToClipboard(processedTemplate)
+            completion?("Copied to clipboard", true)
         case .saveImage:
             executeSaveImage()
+            completion?("Image saved", false)
         case .saveTempFile:
             executeSaveTempFile(text)
+            completion?("Saved temp file", false)
         case .stripANSI:
             executeStripANSI(text)
+            completion?("ANSI codes stripped", true)
         case .htmlToMarkdown:
-            executeHtmlToMarkdown(text)
+            executeHtmlToMarkdown(text, completion: completion)
         case .summarize:
-            executeSummarize(text)
+            executeSummarize(text, completion: completion)
         }
     }
 
@@ -155,27 +168,32 @@ final class CustomActionsStore: ObservableObject {
         NSWorkspace.shared.open(url)
     }
 
-    private func executeShellCommand(_ command: String) {
+    private func executeShellCommand(_ command: String, completion: ActionCompletion? = nil) {
         Task.detached {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/zsh")
             process.arguments = ["-c", command]
-            
+
             let pipe = Pipe()
             process.standardOutput = pipe
             process.standardError = pipe
-            
+
             do {
                 try process.run()
                 process.waitUntilExit()
-                
+
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8) ?? ""
+
                 if process.terminationStatus != 0 {
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    let errorOutput = String(data: data, encoding: .utf8) ?? "Unknown error"
-                    Logger.error("Command failed with exit code \(process.terminationStatus): \(errorOutput)", category: .actions)
+                    Logger.error("Command failed with exit code \(process.terminationStatus): \(output)", category: .actions)
+                    await MainActor.run { completion?("Command failed: \(output)", false) }
+                } else {
+                    await MainActor.run { completion?(output.isEmpty ? "Command completed" : output, false) }
                 }
             } catch {
                 Logger.error("Failed to run command: \(error)", category: .actions)
+                await MainActor.run { completion?("Failed: \(error.localizedDescription)", false) }
             }
         }
     }
@@ -284,35 +302,34 @@ final class CustomActionsStore: ObservableObject {
         NSPasteboard.general.setString(stripped, forType: .string)
     }
 
-    private func executeHtmlToMarkdown(_ html: String) {
-        // Try using pandoc first (if installed)
+    private func executeHtmlToMarkdown(_ html: String, completion: ActionCompletion? = nil) {
         _ = Task.detached { [weak self] in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
             process.arguments = ["pandoc", "-f", "html", "-t", "markdown", "--wrap=none"]
-            
+
             let inputPipe = Pipe()
             let outputPipe = Pipe()
             process.standardInput = inputPipe
             process.standardOutput = outputPipe
-            
+
             do {
                 try process.run()
-                
-                // Write HTML to stdin
+
                 if let data = html.data(using: .utf8) {
                     inputPipe.fileHandleForWriting.write(data)
                     inputPipe.fileHandleForWriting.closeFile()
                 }
-                
+
                 process.waitUntilExit()
-                
+
                 if process.terminationStatus == 0 {
                     let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
                     if let markdown = String(data: data, encoding: .utf8) {
-                        Task { @MainActor in
+                        await MainActor.run {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(markdown, forType: .string)
+                            completion?("Converted to Markdown", true)
                         }
                         return
                     }
@@ -320,13 +337,13 @@ final class CustomActionsStore: ObservableObject {
             } catch {
                 Logger.debug("Pandoc not available, using fallback: \(error)", category: .actions)
             }
-            
-            // Fallback: Use NSAttributedString to extract text
-            Task { @MainActor [weak self] in
+
+            await MainActor.run { [weak self] in
                 guard let self else { return }
                 let markdown = self.simpleHtmlToMarkdown(html)
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(markdown, forType: .string)
+                completion?("Converted to Markdown", true)
             }
         }
     }
@@ -398,36 +415,31 @@ final class CustomActionsStore: ObservableObject {
         return markdown.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func executeSummarize(_ text: String) {
-        // Check if content looks like HTML and convert it first
+    private func executeSummarize(_ text: String, completion: ActionCompletion? = nil) {
         let contentToSummarize: String
         if text.contains("<") && text.contains(">") {
             contentToSummarize = simpleHtmlToMarkdown(text)
         } else {
             contentToSummarize = text
         }
-        
-        // Truncate if too long (LLM context limit consideration)
+
         let maxLength = 3000
-        let truncatedContent = contentToSummarize.count > maxLength 
+        let truncatedContent = contentToSummarize.count > maxLength
             ? String(contentToSummarize.prefix(maxLength)) + "\n\n[Content truncated for summarization]"
             : contentToSummarize
-        
-        // Use LLM to summarize
+
         Task {
             do {
                 let summary = try await LLMService.shared.summarizeText(truncatedContent)
                 await MainActor.run {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(summary, forType: .string)
-                    
-                    // Show notification
-                    showNotification(title: "Summary Ready", body: "The summary has been copied to your clipboard.")
+                    completion?(summary, true)
                 }
             } catch {
                 await MainActor.run {
                     Logger.error("Failed to summarize: \(error)", category: .actions)
-                    self.showErrorAlert(title: "Summarization Failed", message: "Could not generate summary. Please check your LLM settings.")
+                    completion?("Summarization failed: \(error.localizedDescription)", false)
                 }
             }
         }

@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Tool-based skill runtime with `ToolDefinition`, `ToolExecutor`, `ToolValidator`, and fixed `ExecuteFunction` dispatch.
+- JSON `## Tools` parsing for built-in skill sources, plus readable Markdown export to `~/.copycopy/skills/`.
+- Runtime permission diagnostics for Accessibility vs. event-tap state, including clearer menu prompts and Debug status.
+
+### Changed
+- Built-in skills are now the primary suggestion source.
+- Built-in skill files are exported in a readable legacy `## Actions` format on first write.
+- `README.md` and assistant guidance now describe the skill-first architecture and the MLX-safe build path.
+
+### Removed
+- Legacy LLM-generated clipboard action suggestions.
+- The old `ActionExecutor` shell/template execution path for built-in skills.
+
 ## 0.2.2 — 2025-12-31
 
 ### Fixes

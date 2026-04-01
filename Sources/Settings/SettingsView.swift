@@ -2,8 +2,6 @@ import SwiftUI
 
 enum SettingsTab: String, Hashable {
     case general
-    case actions
-    case llm
     case about
     case debug
 }
@@ -12,7 +10,6 @@ enum SettingsTab: String, Hashable {
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var model: AppModel
-    @ObservedObject var actionsStore: CustomActionsStore
     let updater: UpdaterProviding
     @State private var selectedTab: SettingsTab = .general
 
@@ -21,14 +18,6 @@ struct SettingsView: View {
             SettingsGeneralPane(settings: settings)
                 .tabItem { Label("General", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
-
-            SettingsActionsPane(actionsStore: actionsStore)
-                .tabItem { Label("Actions", systemImage: "sparkles.rectangle.stack") }
-                .tag(SettingsTab.actions)
-
-            SettingsLLMPane(settings: settings)
-                .tabItem { Label("AI", systemImage: "brain") }
-                .tag(SettingsTab.llm)
 
             SettingsAboutPane(updater: updater)
                 .tabItem { Label("About", systemImage: "info.circle") }

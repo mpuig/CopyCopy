@@ -22,6 +22,10 @@ final class CopyEventTap {
     private var runLoopSource: CFRunLoopSource?
     private var lastCopyTimestamp: TimeInterval?
 
+    var isRunning: Bool {
+        eventTap != nil
+    }
+
     deinit {
         stop()
     }
