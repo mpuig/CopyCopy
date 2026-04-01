@@ -33,4 +33,8 @@ final class PasteboardMonitor {
         timer?.cancel()
         timer = nil
     }
+
+    deinit {
+        stop()
+    }
 }

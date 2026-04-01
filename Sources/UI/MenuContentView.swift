@@ -5,6 +5,7 @@ struct MenuContentView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var settings: AppSettings
     @ObservedObject var actionsStore: CustomActionsStore
+    @ObservedObject var localLLM = LocalLLMService.shared
     let updater: UpdaterProviding
 
     var body: some View {
@@ -51,6 +52,17 @@ struct MenuContentView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // Show download progress if model is loading
+            if localLLM.isLoading {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(localLLM.loadingProgress)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
             if let context = model.lastClipboardContext {
                 HStack(spacing: 6) {
                     Image(systemName: iconForKind(context.snapshot.kind))

@@ -10,6 +10,8 @@ enum ActionType: String, Codable, CaseIterable, Identifiable {
     case saveImage = "saveImage"
     case saveTempFile = "saveTempFile"
     case stripANSI = "stripANSI"
+    case htmlToMarkdown = "htmlToMarkdown"
+    case summarize = "summarize"
 
     var id: String { rawValue }
 
@@ -24,6 +26,8 @@ enum ActionType: String, Codable, CaseIterable, Identifiable {
         case .saveImage: return "Save Image"
         case .saveTempFile: return "Save as Temp File"
         case .stripANSI: return "Strip ANSI Codes"
+        case .htmlToMarkdown: return "Convert HTML to Markdown"
+        case .summarize: return "Summarize Content"
         }
     }
 
@@ -38,6 +42,8 @@ enum ActionType: String, Codable, CaseIterable, Identifiable {
         case .saveImage: return "square.and.arrow.down"
         case .saveTempFile: return "doc.badge.plus"
         case .stripANSI: return "textformat"
+        case .htmlToMarkdown: return "arrow.down.doc.text"
+        case .summarize: return "text.redaction"
         }
     }
 
@@ -45,7 +51,7 @@ enum ActionType: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .openURL, .shellCommand, .openApp, .copyToClipboard:
             return true
-        case .revealInFinder, .openFile, .saveImage, .saveTempFile, .stripANSI:
+        case .revealInFinder, .openFile, .saveImage, .saveTempFile, .stripANSI, .htmlToMarkdown, .summarize:
             return false
         }
     }
@@ -143,33 +149,9 @@ enum EntityFilter: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     var displayName: String {
-        switch self {
-        case .any: return "Any"
-        case .personalName: return "Name"
-        case .placeName: return "Place"
-        case .organizationName: return "Organization"
-        case .phoneNumber: return "Phone"
-        case .date: return "Date"
-        case .address: return "Address"
-        case .transitInfo: return "Flight/Transit"
-        case .email: return "Email"
-        case .hexColor: return "Color"
-        case .ipAddress: return "IP Address"
-        case .uuid: return "UUID"
-        case .trackingNumber: return "Tracking #"
-        case .gitSha: return "Git SHA"
-        case .hashtag: return "Hashtag"
-        case .mention: return "Mention"
-        case .currency: return "Currency"
-        case .coordinates: return "Coordinates"
-        case .filePath: return "File Path"
-        case .json: return "JSON"
-        case .base64: return "Base64"
-        case .urlEncoded: return "URL Encoded"
-        case .markdown: return "Markdown"
-        case .codeSnippet: return "Code"
-        case .foreignLanguage: return "Foreign Language"
-        }
+        // Map to DetectedEntityType to avoid duplicating display names
+        let entityType = DetectedEntityType(rawValue: rawValue) ?? .none
+        return entityType.displayName
     }
 
     func matches(_ entity: DetectedEntityType) -> Bool {
@@ -753,6 +735,28 @@ extension CustomAction {
             contentFilter: .text,
             entityFilter: .foreignLanguage,
             systemImage: "globe",
+            isBuiltIn: true
+        ),
+
+        // HTML to Markdown action
+        CustomAction(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000037")!,
+            name: "Convert HTML to Markdown",
+            actionType: .htmlToMarkdown,
+            template: "",
+            contentFilter: .text,
+            systemImage: "arrow.down.doc.text",
+            isBuiltIn: true
+        ),
+
+        // Summarize action
+        CustomAction(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000038")!,
+            name: "Summarize Content",
+            actionType: .summarize,
+            template: "",
+            contentFilter: .text,
+            systemImage: "text.redaction",
             isBuiltIn: true
         ),
     ]

@@ -8,6 +8,7 @@ final class AppModel: ObservableObject {
     @Published var lastClipboardContext: ClipboardContext?
     @Published var suggestedActions: [SuggestedAction] = []
     @Published var triggerPulseID: UUID = UUID()
+    @Published var isLLMLoading: Bool = false
 
     private let settings: AppSettings
     private let actionsStore: CustomActionsStore
@@ -15,6 +16,7 @@ final class AppModel: ObservableObject {
     private let copyEventTap = CopyEventTap()
     private let pasteboardMonitor = PasteboardMonitor()
     private let classifier = ClipboardClassifier()
+    private let llmSuggester = LLMActionSuggester()
 
     private var lastCopyKeyEvent: CopyKeyEvent?
     private var lastTriggerTimestamp: TimeInterval?
@@ -22,8 +24,11 @@ final class AppModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     private enum Constants {
+        /// First clipboard capture attempt delay (80ms) - Quick initial check to capture immediately available content
         static let clipboardCaptureDelay1: UInt64 = 80_000_000
+        /// Second clipboard capture attempt delay (200ms) - Allows slower apps (browsers, IDEs) time to write large content to clipboard
         static let clipboardCaptureDelay2: UInt64 = 200_000_000
+        /// Menu trigger delay (120ms) - Ensures clipboard capture completes before showing UI to prevent race conditions
         static let menuTriggerDelay: UInt64 = 120_000_000
         static let copyEventWindowSeconds: TimeInterval = 1.0
     }
@@ -70,16 +75,23 @@ final class AppModel: ObservableObject {
         pasteboardMonitor.start()
 
         startEventTapIfPossible()
+        
+        // Preload local LLM model if enabled
+        if settings.llmEnabled && settings.useLocalLLM {
+            Task {
+                await LocalLLMService.shared.loadModel()
+            }
+        }
     }
 
     func refreshPermissions(promptIfNeeded: Bool) {
         hasAccessibilityPermission = permissions.hasAccessibilityPermission(promptIfNeeded: promptIfNeeded)
-        print("[AppModel] Accessibility permission: \(hasAccessibilityPermission)")
+        Logger.info("Accessibility permission: \(hasAccessibilityPermission)", category: .permissions)
         if hasAccessibilityPermission {
             let started = copyEventTap.start()
-            print("[AppModel] Event tap start result: \(started)")
+            Logger.info("Event tap start result: \(started)", category: .permissions)
         } else {
-            print("[AppModel] No permission, stopping event tap")
+            Logger.info("No permission, stopping event tap", category: .permissions)
             copyEventTap.stop()
         }
     }
@@ -119,7 +131,7 @@ final class AppModel: ObservableObject {
     }
 
     private func requestShowActions(copyEvent: CopyKeyEvent) {
-        print("[AppModel] 🚀 requestShowActions called from \(copyEvent.appName)")
+        Logger.info("requestShowActions called from \(copyEvent.appName)", category: .clipboard)
         let requestID = UUID()
         pendingShowRequestID = requestID
         beginTriggerFlow(copyEvent: copyEvent)
@@ -128,10 +140,10 @@ final class AppModel: ObservableObject {
             guard let self else { return }
             try? await Task.sleep(nanoseconds: Constants.menuTriggerDelay)
             guard self.pendingShowRequestID == requestID else {
-                print("[AppModel] Request cancelled (new request came in)")
+                Logger.info("Request cancelled (new request came in)", category: .clipboard)
                 return
             }
-            print("[AppModel] 📢 Triggering pulse animation")
+            Logger.info("Triggering pulse animation", category: .clipboard)
             self.triggerPulseID = UUID()
         }
     }
@@ -164,7 +176,7 @@ final class AppModel: ObservableObject {
         let entity = ctx.snapshot.detectedEntity
         let enabledActions = actionsStore.enabledActions(for: ctx.snapshot.kind, sourceContext: sourceContext, entity: entity)
 
-        suggestedActions = enabledActions.map { customAction in
+        var actions: [SuggestedAction] = enabledActions.map { customAction in
             let actionCopy = customAction
             let contextCopy = ctx
             let storeCopy = actionsStore
@@ -176,6 +188,40 @@ final class AppModel: ObservableObject {
                 storeCopy.execute(actionCopy, with: contextCopy)
             }
         }
+
+        // Add LLM-powered suggestions if enabled
+        if settings.llmEnabled {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.isLLMLoading = true
+                
+                let llmSuggestions: [LLMSuggestedAction]
+                if self.settings.useLocalLLM {
+                    // Use local LLM
+                    llmSuggestions = (try? await LocalLLMService.shared.suggestActions(clipboardContext: ctx)) ?? []
+                } else {
+                    // Use cloud LLM via HuggingFace
+                    llmSuggestions = await self.llmSuggester.suggestActions(
+                        for: ctx,
+                        apiKey: self.settings.llmApiKey,
+                        enabled: self.settings.llmEnabled
+                    )
+                }
+                
+                if !llmSuggestions.isEmpty {
+                    let llmActions = self.llmSuggester.convertToSuggestedActions(
+                        llmSuggestions: llmSuggestions,
+                        context: ctx
+                    )
+                    actions.insert(contentsOf: llmActions, at: 0)
+                    self.suggestedActions = actions
+                }
+                
+                self.isLLMLoading = false
+            }
+        }
+
+        suggestedActions = actions
     }
 
     func showAbout() {

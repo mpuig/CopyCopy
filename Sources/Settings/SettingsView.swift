@@ -3,6 +3,7 @@ import SwiftUI
 enum SettingsTab: String, Hashable {
     case general
     case actions
+    case llm
     case about
     case debug
 }
@@ -24,6 +25,10 @@ struct SettingsView: View {
             SettingsActionsPane(actionsStore: actionsStore)
                 .tabItem { Label("Actions", systemImage: "sparkles.rectangle.stack") }
                 .tag(SettingsTab.actions)
+
+            SettingsLLMPane(settings: settings)
+                .tabItem { Label("AI", systemImage: "brain") }
+                .tag(SettingsTab.llm)
 
             SettingsAboutPane(updater: updater)
                 .tabItem { Label("About", systemImage: "info.circle") }

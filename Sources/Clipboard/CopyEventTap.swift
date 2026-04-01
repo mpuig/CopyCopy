@@ -22,13 +22,17 @@ final class CopyEventTap {
     private var runLoopSource: CFRunLoopSource?
     private var lastCopyTimestamp: TimeInterval?
 
+    deinit {
+        stop()
+    }
+
     func start() -> Bool {
         guard eventTap == nil else {
-            print("[CopyEventTap] Already running")
+            Logger.info("[CopyEventTap] Already running", category: .clipboard)
             return true
         }
 
-        print("[CopyEventTap] Starting event tap...")
+        Logger.info("[CopyEventTap] Starting event tap...", category: .clipboard)
         let mask = (1 << CGEventType.keyDown.rawValue)
         let callback: CGEventTapCallBack = { proxy, type, event, userInfo in
             guard let userInfo else { return Unmanaged.passUnretained(event) }
@@ -53,10 +57,10 @@ final class CopyEventTap {
             callback: callback,
             userInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         ) else {
-            print("[CopyEventTap] ❌ Failed to create event tap - check Accessibility/Input Monitoring permissions")
+            Logger.error("[CopyEventTap] ❌ Failed to create event tap - check Accessibility/Input Monitoring permissions", category: .clipboard)
             return false
         }
-        print("[CopyEventTap] ✅ Event tap created successfully")
+        Logger.info("[CopyEventTap] ✅ Event tap created successfully", category: .clipboard)
 
         eventTap = tap
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
@@ -92,7 +96,7 @@ final class CopyEventTap {
         guard flags.contains(.maskCommand) else { return }
 
         let now = CACurrentMediaTime()
-        print("[CopyEventTap] ⌘C detected at \(now)")
+        Logger.debug("[CopyEventTap] ⌘C detected at \(now)", category: .clipboard)
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
@@ -108,13 +112,13 @@ final class CopyEventTap {
 
             if let last = self.lastCopyTimestamp, (now - last) <= self.doublePressThreshold {
                 let interval = now - last
-                print("[CopyEventTap] 🎯 Double ⌘C detected! Interval: \(String(format: "%.0f", interval * 1000))ms (threshold: \(String(format: "%.0f", self.doublePressThreshold * 1000))ms)")
+                Logger.info("[CopyEventTap] 🎯 Double ⌘C detected! Interval: \(String(format: "%.0f", interval * 1000))ms (threshold: \(String(format: "%.0f", self.doublePressThreshold * 1000))ms)", category: .clipboard)
                 self.onDoubleCopy?(copyEvent)
                 self.lastCopyTimestamp = nil
             } else {
                 if let last = self.lastCopyTimestamp {
                     let interval = now - last
-                    print("[CopyEventTap] Too slow: \(String(format: "%.0f", interval * 1000))ms > \(String(format: "%.0f", self.doublePressThreshold * 1000))ms threshold")
+                    Logger.debug("[CopyEventTap] Too slow: \(String(format: "%.0f", interval * 1000))ms > \(String(format: "%.0f", self.doublePressThreshold * 1000))ms threshold", category: .clipboard)
                 }
                 self.lastCopyTimestamp = now
             }

@@ -200,6 +200,10 @@ struct ActionEditorView: View {
             return "Saves text to a temporary file and opens it."
         case .stripANSI:
             return "Removes ANSI color codes from terminal output."
+        case .htmlToMarkdown:
+            return "Converts HTML content to clean Markdown."
+        case .summarize:
+            return "Summarizes content using AI (converts HTML to text first if needed)."
         }
     }
 
@@ -236,7 +240,7 @@ struct ActionEditorView: View {
         case .shellCommand: return "Command"
         case .openApp: return "Text to Paste"
         case .copyToClipboard: return "Text Template"
-        case .revealInFinder, .openFile, .saveImage, .saveTempFile, .stripANSI:
+        case .revealInFinder, .openFile, .saveImage, .saveTempFile, .stripANSI, .htmlToMarkdown, .summarize:
             return "Template"
         }
     }
@@ -269,7 +273,22 @@ struct ActionEditorView: View {
                 }
                 return "Other"
             },
-            set: { _ in }
+            set: { newValue in
+                switch newValue {
+                case "ChatGPT":
+                    if !action.template.lowercased().contains("chatgpt") {
+                        action.template = "Summarize: {text}"
+                    }
+                case "Claude":
+                    if !action.template.lowercased().contains("claude") {
+                        action.template = "Summarize: {text}"
+                    }
+                case "Other":
+                    break
+                default:
+                    break
+                }
+            }
         )
     }
 
