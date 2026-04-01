@@ -22,6 +22,8 @@ final class AppModel: ObservableObject {
     private var lastCopyKeyEvent: CopyKeyEvent?
     private var lastTriggerTimestamp: TimeInterval?
     private var pendingShowRequestID: UUID?
+    private var semanticClassificationTask: Task<Void, Never>?
+    private var semanticClassificationCache: [String: [DetectedEntityType]] = [:]
     private var cancellables = Set<AnyCancellable>()
     private var floatingPanel: FloatingActionPanel?
 
@@ -202,17 +204,98 @@ final class AppModel: ObservableObject {
         }
 
         let sourceContext = ctx.sourceAppContext
-        let entity = ctx.snapshot.detectedEntity
 
-        var actions = skillLoader.matchingActions(
+        let actions = skillLoader.matchingActions(
             for: ctx.snapshot.kind,
             sourceContext: sourceContext,
-            entity: entity,
+            entities: ctx.snapshot.detectedEntities,
             context: ctx,
             executor: actionExecutor
         )
 
         suggestedActions = actions
+        scheduleSemanticClassificationIfNeeded(for: ctx)
+    }
+
+    private func scheduleSemanticClassificationIfNeeded(for context: ClipboardContext) {
+        guard settings.llmEnabled, settings.useLocalLLM, LocalLLMService.shared.isReady else { return }
+        guard context.snapshot.kind == .plainText, let text = context.snapshot.plainText else { return }
+        guard shouldRunSemanticClassification(for: text, entities: context.snapshot.detectedEntities) else { return }
+
+        let cacheKey = semanticClassificationCacheKey(for: text)
+        if let cached = semanticClassificationCache[cacheKey] {
+            applySemanticClassification(cached, to: context)
+            return
+        }
+
+        semanticClassificationTask?.cancel()
+        let changeCount = context.snapshot.changeCount
+        let capturedAt = context.capturedAt
+
+        semanticClassificationTask = Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let tags = try await LocalLLMService.shared.classifyTextEntities(text)
+                guard !Task.isCancelled else { return }
+
+                await MainActor.run {
+                    self.semanticClassificationCache[cacheKey] = tags
+                    guard let current = self.lastClipboardContext,
+                          current.snapshot.changeCount == changeCount,
+                          current.capturedAt == capturedAt else {
+                        return
+                    }
+                    self.applySemanticClassification(tags, to: current)
+                }
+            } catch {
+                Logger.warning("Semantic text classification failed: \(error)", category: .general)
+            }
+        }
+    }
+
+    private func applySemanticClassification(_ tags: [DetectedEntityType], to context: ClipboardContext) {
+        guard !tags.isEmpty else { return }
+
+        let mergedSnapshot = context.snapshot.merged(with: tags, summary: semanticSummary(for: context.snapshot, additionalTags: tags))
+        guard mergedSnapshot.detectedEntities != context.snapshot.detectedEntities else { return }
+
+        lastClipboardContext = ClipboardContext(
+            copyEvent: context.copyEvent,
+            snapshot: mergedSnapshot,
+            capturedAt: context.capturedAt
+        )
+        refreshSuggestions()
+    }
+
+    private func shouldRunSemanticClassification(for text: String, entities: [DetectedEntityType]) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 24, trimmed.count <= 4000 else { return false }
+
+        let existingTags = Set(entities)
+        let semanticTags: Set<DetectedEntityType> = [.emailDraft, .slackDraft, .shellCommand, .logOutput, .sql]
+        guard semanticTags.isDisjoint(with: existingTags) else { return false }
+
+        let strongDetections: Set<DetectedEntityType> = [
+            .json, .base64, .urlEncoded, .html, .markdown, .codeSnippet, .email, .phoneNumber, .address, .coordinates,
+            .filePath, .ipAddress, .uuid, .currency, .date, .transitInfo, .trackingNumber
+        ]
+        if !strongDetections.isDisjoint(with: existingTags) {
+            return false
+        }
+
+        return true
+    }
+
+    private func semanticClassificationCacheKey(for text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(trimmed.count):\(trimmed)"
+    }
+
+    private func semanticSummary(for snapshot: ClipboardSnapshot, additionalTags: [DetectedEntityType]) -> String {
+        guard let firstTag = additionalTags.first else { return snapshot.summary }
+        guard !snapshot.summary.contains(firstTag.displayName) else { return snapshot.summary }
+        return snapshot.summary + " • " + firstTag.displayName
     }
 
     func showAbout() {

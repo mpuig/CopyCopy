@@ -142,17 +142,17 @@ final class ClipboardClassifier {
     private func detectDataDetectorEntity(from text: String) -> DetectedEntityType? {
         let dataDetectorTypes: NSTextCheckingResult.CheckingType = [.phoneNumber, .date, .address, .transitInformation]
         guard let detector = try? NSDataDetector(types: dataDetectorTypes.rawValue) else {
-            return nil
+            return detectAddressHeuristic(from: text) ? .address : nil
         }
 
         let range = NSRange(text.startIndex..., in: text)
         guard let match = detector.firstMatch(in: text, options: [], range: range) else {
-            return nil
+            return detectAddressHeuristic(from: text) ? .address : nil
         }
 
         let coverage = Double(match.range.length) / Double(range.length)
         guard coverage > 0.6 else {
-            return nil
+            return detectAddressHeuristic(from: text) ? .address : nil
         }
 
         switch match.resultType {
@@ -165,8 +165,40 @@ final class ClipboardClassifier {
         case .transitInformation:
             return .transitInfo
         default:
-            return nil
+            return detectAddressHeuristic(from: text) ? .address : nil
         }
+    }
+
+    private func detectAddressHeuristic(from text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 12 else { return false }
+        guard trimmed.contains(",") else { return false }
+
+        let normalized = trimmed.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+
+        let iberianAddressKeywords = [
+            "urb.", "urbanizacion", "urbanització", "calle", "carrer", "avinguda", "avenida",
+            "av.", "plaza", "placa", "plaça", "passeig", "passatge", "camino", "cami",
+            "carretera", "rambla", "edificio", "poligono", "poligon", "apartamento"
+        ]
+
+        let hasAddressKeyword = iberianAddressKeywords.contains { normalized.contains($0) }
+        let hasPostalCode = matches(normalized, pattern: #"\b\d{5}\b"#)
+        let hasProvinceInParens = matches(normalized, pattern: #"\([a-z][^)]{1,40}\)"#)
+        let commaSegments = trimmed
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let hasMunicipalityLikeSegments = commaSegments.count >= 3
+        let alphabeticWords = trimmed.split(whereSeparator: { !$0.isLetter }).count
+
+        guard alphabeticWords >= 5 else { return false }
+
+        if hasPostalCode && (hasAddressKeyword || hasProvinceInParens || hasMunicipalityLikeSegments) {
+            return true
+        }
+
+        return false
     }
 
     private func detectPattern(from text: String) -> DetectedEntityType? {
@@ -289,6 +321,12 @@ final class ClipboardClassifier {
             if let decoded = trimmed.removingPercentEncoding, decoded != trimmed {
                 return .urlEncoded
             }
+        }
+
+        // HTML snippet
+        let htmlPattern = #"(?is)^\s*<(?:!DOCTYPE\s+html|html|head|body|div|span|p|a|ul|ol|li|table|tr|td|th|section|article|main|header|footer|nav|img|svg|form|input|button|h[1-6]|pre|code|blockquote)\b[^>]*>.*</(?:html|head|body|div|span|p|a|ul|ol|li|table|tr|td|th|section|article|main|header|footer|nav|svg|form|button|h[1-6]|pre|code|blockquote)>\s*$|^\s*<[^>]+/>\s*$"#
+        if matches(trimmed, pattern: htmlPattern) {
+            return .html
         }
 
         // Markdown (headers, links, bold, code blocks)

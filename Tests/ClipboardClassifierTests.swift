@@ -115,6 +115,11 @@ final class ClipboardClassifierTests: XCTestCase {
         XCTAssertEqual(classifier.detectEntity(from: markdown), .markdown)
     }
 
+    func testDetectHTMLEntity() {
+        let html = "<div><p>Hello <strong>world</strong></p></div>"
+        XCTAssertEqual(classifier.detectEntity(from: html), .html)
+    }
+
     func testDetectCodeSnippetEntity() {
         let codeSnippets = ["func test() {}", "const x = 1;", "import Foundation"]
         for code in codeSnippets {

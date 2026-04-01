@@ -115,6 +115,12 @@ final class CustomActionTests: XCTestCase {
         XCTAssertFalse(filter.matches(.none))
     }
 
+    func testEntityFilterMatchesAny() {
+        XCTAssertTrue(EntityFilter.codeSnippet.matchesAny([.none, .codeSnippet]))
+        XCTAssertTrue(EntityFilter.slackDraft.matchesAny([.emailDraft, .slackDraft]))
+        XCTAssertFalse(EntityFilter.emailDraft.matchesAny([.codeSnippet, .markdown]))
+    }
+
     func testActionTypeDisplayName() {
         XCTAssertEqual(ActionType.openURL.displayName, "Open URL")
         XCTAssertEqual(ActionType.shellCommand.displayName, "Run Shell Command")

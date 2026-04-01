@@ -141,10 +141,17 @@ enum EntityFilter: String, Codable, CaseIterable, Identifiable {
     case json = "json"
     case base64 = "base64"
     case urlEncoded = "urlEncoded"
+    case html = "html"
     case markdown = "markdown"
     case codeSnippet = "codeSnippet"
     // Language
     case foreignLanguage = "foreignLanguage"
+    // Semantic text categories
+    case emailDraft = "emailDraft"
+    case slackDraft = "slackDraft"
+    case shellCommand = "shellCommand"
+    case logOutput = "logOutput"
+    case sql = "sql"
 
     var id: String { rawValue }
 
@@ -178,9 +185,24 @@ enum EntityFilter: String, Codable, CaseIterable, Identifiable {
         case .json: return entity == .json
         case .base64: return entity == .base64
         case .urlEncoded: return entity == .urlEncoded
+        case .html: return entity == .html
         case .markdown: return entity == .markdown
         case .codeSnippet: return entity == .codeSnippet
         case .foreignLanguage: return entity == .foreignLanguage
+        case .emailDraft: return entity == .emailDraft
+        case .slackDraft: return entity == .slackDraft
+        case .shellCommand: return entity == .shellCommand
+        case .logOutput: return entity == .logOutput
+        case .sql: return entity == .sql
+        }
+    }
+
+    func matchesAny(_ entities: [DetectedEntityType]) -> Bool {
+        switch self {
+        case .any:
+            return true
+        default:
+            return entities.contains(where: matches)
         }
     }
 }

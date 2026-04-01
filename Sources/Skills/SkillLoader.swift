@@ -101,19 +101,19 @@ final class SkillLoader {
     func matchingActions(
         for contentKind: ClipboardContentKind,
         sourceContext: SourceAppContext,
-        entity: DetectedEntityType,
+        entities: [DetectedEntityType],
         context: ClipboardContext,
         executor: ToolExecutor
     ) -> [SuggestedAction] {
         var result: [SuggestedAction] = []
 
         for skill in skills {
-            guard skillMatches(skill, contentKind: contentKind, entity: entity, sourceContext: sourceContext) else {
+            guard skillMatches(skill, contentKind: contentKind, entities: entities, sourceContext: sourceContext) else {
                 continue
             }
 
             for tool in skill.tools {
-                guard toolMatches(tool, skill: skill, contentKind: contentKind, entity: entity, sourceContext: sourceContext) else {
+                guard toolMatches(tool, skill: skill, contentKind: contentKind, entities: entities, sourceContext: sourceContext) else {
                     continue
                 }
                 result.append(toSuggestedAction(tool, context: context, executor: executor))
@@ -128,14 +128,14 @@ final class SkillLoader {
     private func skillMatches(
         _ skill: Skill,
         contentKind: ClipboardContentKind,
-        entity: DetectedEntityType,
+        entities: [DetectedEntityType],
         sourceContext: SourceAppContext
     ) -> Bool {
         if !skill.contentTypes.isEmpty {
             guard skill.contentTypes.contains(where: { $0.matches(contentKind) }) else { return false }
         }
         if !skill.entityTypes.isEmpty {
-            guard skill.entityTypes.contains(where: { $0.matches(entity) }) else { return false }
+            guard skill.entityTypes.contains(where: { $0.matchesAny(entities) }) else { return false }
         }
         if !skill.sourceContexts.isEmpty {
             guard skill.sourceContexts.contains(where: { $0.matches(sourceContext) }) else { return false }
@@ -147,12 +147,12 @@ final class SkillLoader {
         _ tool: ToolDefinition,
         skill: Skill,
         contentKind: ClipboardContentKind,
-        entity: DetectedEntityType,
+        entities: [DetectedEntityType],
         sourceContext: SourceAppContext
     ) -> Bool {
         let entityTypes = tool.parsedEntityTypes
         if !entityTypes.isEmpty {
-            guard entityTypes.contains(where: { $0.matches(entity) }) else { return false }
+            guard entityTypes.contains(where: { $0.matchesAny(entities) }) else { return false }
         }
         let sourceContexts = tool.parsedSourceContexts
         if !sourceContexts.isEmpty {

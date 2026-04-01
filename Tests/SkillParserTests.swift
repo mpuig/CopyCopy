@@ -122,6 +122,7 @@ final class SkillParserTests: XCTestCase {
         let skill = try SkillParser.parse(id: "transform", content: BuiltInSkills.transform, isBuiltIn: true)
         let rewriteTool = try XCTUnwrap(skill.tools.first { $0.id == "rewrite-email-draft" })
 
+        XCTAssertEqual(rewriteTool.parsedEntityTypes, [.emailDraft])
         XCTAssertEqual(
             rewriteTool.parameters.properties["systemPrompt"]?.value,
             "Rewrite the clipboard text as a polished email reply draft. Preserve the original intent, key facts, commitments, and requested actions. Improve clarity, grammar, tone, and structure. Keep it concise and natural. Return only the rewritten email body with no commentary, subject line, or markdown."
@@ -132,9 +133,40 @@ final class SkillParserTests: XCTestCase {
         let skill = try SkillParser.parse(id: "transform", content: BuiltInSkills.transform, isBuiltIn: true)
         let rewriteTool = try XCTUnwrap(skill.tools.first { $0.id == "rewrite-slack-message" })
 
+        XCTAssertEqual(rewriteTool.parsedEntityTypes, [.slackDraft])
         XCTAssertEqual(
             rewriteTool.parameters.properties["systemPrompt"]?.value,
             "Rewrite the clipboard text as a polished Slack message. Preserve the original intent, key facts, commitments, and requested actions. Improve clarity, tone, and structure while keeping it concise, natural, and conversational. Return only the rewritten message with no commentary or markdown."
+        )
+    }
+
+    func testCodeBuiltInIncludesTempFileToolForCodeLikeContent() throws {
+        let skill = try SkillParser.parse(id: "code", content: BuiltInSkills.code, isBuiltIn: true)
+        let tempFileTool = try XCTUnwrap(skill.tools.first { $0.id == "open-temp-code" })
+
+        XCTAssertEqual(
+            tempFileTool.parsedEntityTypes,
+            [.markdown, .codeSnippet, .shellCommand, .logOutput, .sql]
+        )
+    }
+
+    func testTextBuiltInHTMLToMarkdownRequiresHTMLEntity() throws {
+        let skill = try SkillParser.parse(id: "text", content: BuiltInSkills.text, isBuiltIn: true)
+        let htmlTool = try XCTUnwrap(skill.tools.first { $0.id == "html-to-markdown" })
+
+        XCTAssertEqual(htmlTool.parsedEntityTypes, [.html])
+    }
+
+    func testLocalLLMDetectedEntityParsing() {
+        let response = """
+        ```json
+        ["emailDraft", "slackDraft", "emailDraft", "unknown"]
+        ```
+        """
+
+        XCTAssertEqual(
+            LocalLLMService.parseDetectedEntities(from: response),
+            [.emailDraft, .slackDraft]
         )
     }
 }

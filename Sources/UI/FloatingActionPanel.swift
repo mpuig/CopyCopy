@@ -137,13 +137,37 @@ class FloatingPanelViewModel: ObservableObject {
     }
 
     var contentTypeDescription: String {
+        let topLevelType: String
         switch context.snapshot.kind {
-        case .url: return "URL"
-        case .fileURLs: return "\(context.snapshot.fileURLs?.count ?? 0) files"
-        case .image: return "Image"
-        case .plainText: return "Text (\(context.snapshot.plainText?.count ?? 0) chars)"
-        case .richText: return "Rich Text"
-        case .unknown: return "Unknown"
+        case .url:
+            topLevelType = "URL"
+        case .fileURLs:
+            topLevelType = context.snapshot.fileURLs?.count == 1 ? "File" : "Files"
+        case .image:
+            topLevelType = "Image"
+        case .plainText:
+            topLevelType = "Plain Text"
+        case .richText:
+            topLevelType = "Rich Text"
+        case .unknown:
+            topLevelType = "Unknown"
+        }
+
+        let tags = context.snapshot.detectedEntities
+            .map(\.displayName)
+            .filter { !$0.isEmpty }
+
+        let base = tags.isEmpty ? topLevelType : "\(topLevelType) • \(tags.joined(separator: ", "))"
+
+        switch context.snapshot.kind {
+        case .plainText, .richText:
+            let count = context.snapshot.plainText?.count ?? 0
+            return "\(base) (\(count) chars)"
+        case .fileURLs:
+            let count = context.snapshot.fileURLs?.count ?? 0
+            return count > 1 ? "\(base) (\(count))" : base
+        default:
+            return base
         }
     }
 

@@ -127,6 +127,67 @@ final class LocalLLMService: ObservableObject {
             maxTokens: 500
         )
     }
+
+    func classifyTextEntities(_ text: String) async throws -> [DetectedEntityType] {
+        let truncatedText = text.count > 2500
+            ? String(text.prefix(2500)) + "\n\n[Content truncated]"
+            : text
+
+        let response = try await generate(
+            prompt: truncatedText,
+            systemPrompt: """
+            Classify the clipboard text using only these labels when they apply:
+            ["codeSnippet","markdown","emailDraft","slackDraft","shellCommand","logOutput","sql","foreignLanguage"].
+
+            Rules:
+            - Return a JSON array of zero or more labels from that exact list.
+            - Do not invent labels.
+            - Prefer [] when unsure.
+            - "emailDraft" means the text reads like an email body or reply draft.
+            - "slackDraft" means the text reads like a Slack or chat message draft.
+            - "shellCommand" means the text is primarily a shell command or short shell script.
+            - "logOutput" means the text is primarily logs, stack traces, or command output.
+            - "sql" means the text is primarily SQL code or queries.
+            - "codeSnippet" means the text is primarily source code.
+            - "markdown" means the text is primarily Markdown content.
+            - "foreignLanguage" means the dominant language is not English.
+            Return JSON only.
+            """,
+            temperature: 0.0,
+            maxTokens: 80
+        )
+
+        return Self.parseDetectedEntities(from: response)
+    }
+
+    nonisolated static func parseDetectedEntities(from response: String) -> [DetectedEntityType] {
+        let candidate = extractJSONArray(from: response) ?? response
+        guard let data = candidate.data(using: .utf8),
+              let labels = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+
+        var seen = Set<DetectedEntityType>()
+        var result: [DetectedEntityType] = []
+
+        for label in labels {
+            guard let entity = DetectedEntityType(rawValue: label), entity != .none else { continue }
+            if seen.insert(entity).inserted {
+                result.append(entity)
+            }
+        }
+
+        return result
+    }
+
+    private nonisolated static func extractJSONArray(from text: String) -> String? {
+        guard let start = text.firstIndex(of: "["),
+              let end = text[start...].lastIndex(of: "]") else {
+            return nil
+        }
+
+        return String(text[start...end])
+    }
     
 }
 

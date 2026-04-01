@@ -184,7 +184,8 @@ Activates for any plain or rich text on the clipboard. These are the default gen
         "html": {"type": "string", "description": "Clipboard HTML", "source": "clipboard"}
       },
       "required": ["html"]
-    }
+    },
+    "entityTypes": ["html"]
   }
 ]
 ```
@@ -397,16 +398,16 @@ Activates when the clipboard contains a place name, street address, or GPS coord
     static let code = """
 ---
 name: code
-description: Format JSON and decode Base64 or URL-encoded strings
+description: Format JSON, decode encoded text, and open code-like content as a temp file
 compatibility: macOS 14+
 metadata:
   copycopy-content-types: "text"
-  copycopy-entity-types: "json,base64,urlEncoded"
+  copycopy-entity-types: "json,base64,urlEncoded,markdown,codeSnippet,shellCommand,logOutput,sql"
 ---
 
 # Code
 
-Activates when the clipboard contains JSON, Base64, or URL-encoded text.
+Activates when the clipboard contains JSON, Base64, URL-encoded text, or code-like content.
 
 ## Tools
 
@@ -456,6 +457,21 @@ Activates when the clipboard contains JSON, Base64, or URL-encoded text.
       "required": ["text"]
     },
     "entityTypes": ["urlEncoded"]
+  },
+  {
+    "id": "open-temp-code",
+    "name": "Open as Temp File",
+    "description": "Open as Temp File",
+    "icon": "doc.badge.plus",
+    "execute": "saveTempFile",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "text": {"type": "string", "description": "Clipboard text", "source": "clipboard"}
+      },
+      "required": ["text"]
+    },
+    "entityTypes": ["markdown", "codeSnippet", "shellCommand", "logOutput", "sql"]
   }
 ]
 ```
@@ -708,7 +724,8 @@ AI-powered text transformations using the on-device LFM 2.5 model. Results are c
         "prompt": {"type": "string", "description": "Clipboard text", "source": "clipboard"}
       },
       "required": ["systemPrompt", "prompt"]
-    }
+    },
+    "entityTypes": ["emailDraft"]
   },
   {
     "id": "rewrite-slack-message",
@@ -728,7 +745,8 @@ AI-powered text transformations using the on-device LFM 2.5 model. Results are c
         "prompt": {"type": "string", "description": "Clipboard text", "source": "clipboard"}
       },
       "required": ["systemPrompt", "prompt"]
-    }
+    },
+    "entityTypes": ["slackDraft"]
   }
 ]
 ```

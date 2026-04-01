@@ -31,6 +31,8 @@ struct SettingsDebugPane: View {
                         if let ctx = model.lastClipboardContext {
                             statusRow("Content Type", value: ctx.snapshot.kind.rawValue)
                             statusRow("Summary", value: ctx.snapshot.summary)
+                            let entities = ctx.snapshot.detectedEntities.map(\.displayName).joined(separator: ", ")
+                            statusRow("Detected Tags", value: entities.isEmpty ? "None" : entities)
                             if let appName = ctx.copyEvent?.appName {
                                 statusRow("Source App", value: appName)
                             }
