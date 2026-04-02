@@ -1,16 +1,19 @@
 # CopyCopy
 
-CopyCopy is a native macOS menu bar app that shows contextual clipboard actions when you press ⌘C twice quickly. It classifies the current clipboard content, matches built-in or custom skills, and opens a floating action panel near the cursor.
+Copy anything. Get the smart action.
+
+CopyCopy is a macOS menu bar app that understands what you copy and offers the right action instantly. Double-press ⌘C and a floating panel appears with context-aware suggestions — rewrite an email, summarize an article, format JSON, convert HTML to Markdown — all powered by an on-device LLM. Nothing leaves your Mac.
 
 ## Features
 
-- Double-⌘C trigger with a configurable threshold.
-- Context-aware suggestions for URLs, text, files, and images.
-- Entity detection for JSON, Base64, git SHAs, file paths, coordinates, emails, and more.
-- Built-in skills exported to `~/.copycopy/skills/` as readable `SKILL.md` files.
-- Secure tool execution for built-in skills: validated URLs, path checks, allowlisted apps, and in-process transforms.
-- Optional on-device LFM 2.5 model for prompt-based actions such as summarize and translate.
-- Legacy custom actions editor still available for user-defined actions stored in app settings.
+- **On-device AI actions** — Summarize, translate, rewrite emails and Slack messages, fix grammar, and more using the local LFM 2.5 model. No API keys, no data sent anywhere.
+- **Smart content detection** — Recognizes URLs, JSON, Base64, file paths, code snippets, addresses, foreign languages, and 20+ other content types.
+- **Source-aware ranking** — Knows whether you copied from an email client, chat app, browser, IDE, or terminal, and surfaces the most relevant action first.
+- **HTML to Markdown** — Defuddle-style content extraction converts web pages to clean Markdown, preserving code blocks, callouts, and structure.
+- **Instant local transforms** — Format JSON, decode Base64/URL encoding, strip ANSI codes, and convert text case without touching the network.
+- **Extensible skills** — Create custom `SKILL.md` files in `~/.copycopy/skills/` to add your own actions.
+- **Double-⌘C trigger** — Configurable threshold. No always-on popup or clipboard history.
+- **Privacy first** — No telemetry, no clipboard history, no tracking. The default AI path is on-device.
 
 ## Requirements
 
@@ -56,54 +59,32 @@ swift build
 
 1. Copy something with ⌘C.
 2. Press ⌘C again within the configured threshold.
-3. Pick a suggested action from the floating panel.
+3. Pick an action from the floating panel.
 
-## Skills
+The suggested actions depend on what you copied and where you copied it from. Copying from a mail client surfaces "Rewrite Email Draft" at the top; copying from a terminal surfaces "Strip ANSI Codes"; copying from a browser offers "HTML to Markdown" and "Summarize."
 
-CopyCopy now uses skill files as the primary suggestion system.
+## Built-in skills
 
-- Built-in skills are bundled in the app and loaded first.
-- On startup, built-in skills are exported to `~/.copycopy/skills/<skill-id>/SKILL.md`.
-- If a custom skill file exists with the same id, it overrides the bundled skill.
-- Built-in files are rewritten only when the on-disk file is semantically equivalent to the bundled version, which lets formatting updates land without overwriting user customizations.
+| Skill | What it does |
+|-------|-------------|
+| **Transform** | Summarize, translate, rewrite email/Slack drafts, fix grammar (on-device LLM) |
+| **Text** | Search the web, convert HTML to Markdown |
+| **Code** | Format JSON, decode Base64/URL encoding, open as temp file |
+| **URLs** | Open copied URLs |
+| **Files** | Open or reveal copied files |
+| **Images** | Save clipboard images |
+| **Places** | Open addresses and coordinates in Maps |
+| **Filesystem** | Reveal file paths in Finder, open in Terminal |
 
-The built-in skill source of truth is the internal JSON tool schema, but exported files use a readable Markdown `## Actions` format for editing.
+## Custom skills
 
-## Built-in actions
+Create a `SKILL.md` file in `~/.copycopy/skills/my-skill/` to add your own actions. Skills support two formats: a readable action-block format for hand-editing, and a structured JSON tool format for precise control. See [the docs](https://copycopy.app/actions.html) for the full reference.
 
-Built-in skills cover these areas:
-
-- URLs
-- Files
-- Images
-- Text
-- Contacts
-- Places
-- Code
-- Social
-- Tracking
-- Transform
-- Finance
-- Date & time
-- Filesystem
-- Identity
-
-Examples include:
-
-- Opening copied URLs
-- Pretty-printing JSON
-- Decoding Base64 and URL-encoded text
-- Revealing copied paths in Finder
-- Pinging copied hosts safely
-- Summarizing or translating clipboard text with the on-device model
-
-## Custom actions
-
-The Settings window still includes a legacy custom action editor. Those actions are stored in user defaults and use the older template-based action model. They remain available for user-created workflows, but built-in suggestions now come from the skill system.
+Built-in skills are exported to `~/.copycopy/skills/` on startup. Editing those files overrides the bundled version.
 
 ## Permissions
 
-CopyCopy needs Accessibility permission to observe copy shortcuts. On some macOS setups it also needs Input Monitoring before the event tap can actually run.
+CopyCopy needs Accessibility permission to observe copy shortcuts. On some macOS setups it also needs Input Monitoring before the event tap can run.
 
 Menu bar icon states:
 
@@ -121,19 +102,22 @@ defaults write com.copycopy.app debugMenuEnabled -bool true
 ```
 
 3. Relaunch the app and check `Accessibility Permission` and `Event Tap`.
-4. Make sure you are consistently launching the same app path. macOS TCC permissions can differ between `.build/debug/CopyCopy` and `dist/CopyCopy.app`.
+4. Make sure you are launching the same app path consistently. macOS TCC permissions can differ between `.build/debug/CopyCopy` and `dist/CopyCopy.app`.
 
 ## Architecture
 
 ```text
 Sources/
 ├── Actions/      # Legacy custom-action model and storage
-├── Clipboard/    # Event tap, pasteboard monitoring, classification
+├── Clipboard/    # Event tap, pasteboard monitoring, classification, text preprocessing
 ├── LLM/          # Local and remote summarization services
 ├── Settings/     # Settings UI and app settings
 ├── Skills/       # Skill models, parser, validator, loader, executor
 ├── Suggestions/  # Suggested action display model
 ├── UI/           # Floating panel and menu content
+├── Utilities/    # Logging
+├── ContentExtractor.swift       # Defuddle-style main content extraction
+├── HTMLMarkdownConverter.swift  # HTML-to-Markdown pipeline
 ├── AppModel.swift
 ├── Main.swift
 └── PermissionsManager.swift
@@ -143,8 +127,8 @@ Sources/
 
 - No telemetry.
 - No clipboard history persisted by the app.
-- Clipboard content stays local unless you explicitly use a remote LLM configuration.
-- The default AI path is the on-device local model.
+- Clipboard content stays local unless you explicitly configure a remote LLM.
+- The default AI path is the on-device LFM 2.5 model.
 
 ## Troubleshooting
 

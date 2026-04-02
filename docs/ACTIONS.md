@@ -1,21 +1,17 @@
 # Skills
 
-CopyCopy is now **skill-first**.
+CopyCopy understands what you copy and where you copied it from, then shows the right action. Skills define the available actions — both the built-in ones and any you create yourself.
 
 When you double-press ⌘C, CopyCopy:
 
-1. Captures the current clipboard payload.
-2. Detects the content kind: text, URL, image, or files.
-3. Detects entities inside text: JSON, address, Base64, file path, foreign language, and more.
-4. Loads matching skills from the built-ins plus `~/.copycopy/skills/`.
-5. Shows the tools from those matching skills in the action panel.
+1. Captures the clipboard content.
+2. Detects the content type: text, URL, image, or files.
+3. Detects entities inside text: JSON, address, code snippet, foreign language, and more.
+4. Identifies the source app: browser, email client, chat, IDE, terminal, or notes.
+5. Loads matching skills and ranks actions by relevance to your context.
+6. Shows the best actions in the floating panel.
 
-This page covers:
-
-- how to create a new skill
-- the two supported `SKILL.md` formats
-- available functions and parameter sources
-- examples you can copy directly
+Actions that transform content — rewrite, summarize, format — are ranked higher than actions that just open a URL. Source context adjusts the ranking: copying from a mail client surfaces "Rewrite Email Draft" at the top; copying from a terminal surfaces "Strip ANSI Codes."
 
 ## Quick Start
 
@@ -40,26 +36,17 @@ If your folder name matches a built-in skill id such as `text` or `code`, your f
 
 CopyCopy supports **both** of these `SKILL.md` styles:
 
-1. **Readable `## Actions` format**
-   This is what CopyCopy exports into `~/.copycopy/skills/` on first launch. It is the easiest format to hand-edit.
+1. **Readable `## Actions` format** — Easiest to hand-edit. This is what CopyCopy exports to `~/.copycopy/skills/`.
+2. **Structured `## Tools` JSON format** — The canonical internal format. Use it if you need explicit schemas and typed parameters.
 
-2. **Structured `## Tools` JSON format**
-   This is the canonical internal format. Use it if you want explicit schemas and typed parameters.
-
-If you are starting from scratch, the easiest path is:
-
-- copy one of the built-in exported skill files
-- keep the readable `## Actions` format
-- only move to `## Tools` JSON if you need finer control
+If you are starting from scratch, copy one of the built-in exported skill files and modify it.
 
 ## Minimal Skill Example
-
-This is the easiest format to write by hand:
 
 ```markdown
 ---
 name: my-skill
-description: Search copied text and rewrite drafts
+description: Rewrite and fix copied text with AI
 compatibility: macOS 14+
 metadata:
   content_types: [ text ]
@@ -71,13 +58,12 @@ Activates for general text on the clipboard.
 
 ## Actions
 
-### search-web
+### fix-grammar
 
-type: function
-function: openURL
-template: https://duckduckgo.com/?q={text:encoded}
-icon: magnifyingglass
-description: Search the Web
+type: prompt
+prompt: Fix the grammar and spelling in the clipboard text. Preserve the original meaning and tone. Return only the corrected text.
+icon: textformat.abc
+description: Fix Grammar
 
 ### rewrite-email
 
@@ -85,6 +71,7 @@ type: prompt
 prompt: Rewrite the clipboard text as a polished email reply draft. Preserve the original intent and key facts. Return only the rewritten email body.
 icon: envelope.badge
 description: Rewrite Email Draft
+source_contexts: [email]
 ```
 
 ## Frontmatter
@@ -141,30 +128,21 @@ If you omit `content_types`, the skill can match any clipboard kind.
 - `browser`
 - `ide`
 - `terminal`
+- `email`
+- `chat`
+- `notes`
+
+Source context determines the app where you pressed ⌘C. It influences action ranking: actions scoped to the current source appear first, but all matching actions remain available.
 
 If you omit `source_contexts`, the skill can match any app source.
 
 ### Common entity types
 
-Examples:
-
-- `json`
-- `base64`
-- `urlEncoded`
-- `markdown`
-- `codeSnippet`
-- `email`
-- `phoneNumber`
-- `address`
-- `placeName`
-- `coordinates`
-- `filePath`
-- `gitSha`
-- `ipAddress`
-- `currency`
-- `foreignLanguage`
-
-CopyCopy also supports the rest of the built-in entity names used by the clipboard classifier.
+- `json`, `base64`, `urlEncoded`, `html`, `markdown`, `codeSnippet`
+- `email`, `phoneNumber`, `address`, `placeName`, `coordinates`
+- `filePath`, `gitSha`, `ipAddress`, `currency`
+- `foreignLanguage`, `emailDraft`, `slackDraft`
+- `shellCommand`, `logOutput`, `sql`
 
 ## Readable `## Actions` Format
 
@@ -172,7 +150,20 @@ Each action starts with a `### action-id` block.
 
 ### Prompt action
 
-Use this for AI rewrites, summaries, translation, and similar prompt-based tools:
+Use this for AI-powered actions — rewriting, summarization, translation, grammar fixes, and code explanation. These run on the on-device LFM 2.5 model. The result is copied to the clipboard automatically.
+
+The model works best with clear, direct system prompts. Tell it what to do and what to return — avoid complex multi-step instructions.
+
+```markdown
+### summarize
+
+type: prompt
+prompt: Summarize the clipboard text into 3-5 bullet points. Preserve the main point and the most important supporting details. Omit filler and repetition. Return only the summary.
+icon: text.redaction
+description: Summarize Content
+```
+
+You can scope prompt actions to a source context:
 
 ```markdown
 ### rewrite-slack
@@ -181,6 +172,19 @@ type: prompt
 prompt: Rewrite the clipboard text as a polished Slack message. Keep it concise, clear, and conversational. Return only the rewritten message.
 icon: message.badge
 description: Rewrite Slack Message
+source_contexts: [chat]
+```
+
+Or to an entity type:
+
+```markdown
+### explain-code
+
+type: prompt
+prompt: Explain what this code does in plain language. Be brief and focus on the purpose, not line-by-line detail.
+icon: doc.text.magnifyingglass
+description: Explain Code
+entity_types: [codeSnippet]
 ```
 
 ### Function action
@@ -188,21 +192,18 @@ description: Rewrite Slack Message
 Use this for URL opening, built-in transforms, file actions, and similar non-prompt tools:
 
 ```markdown
-### pretty-json
+### decode-base64
 
 type: function
-function: shellCommand
-template: echo {text} | python3 -m json.tool | pbcopy
-icon: curlybraces
-description: Pretty Print JSON
-entity_types: [json]
+function: decodeBase64
+icon: arrow.down.doc
+description: Decode Base64
+entity_types: [base64]
 ```
 
 #### Supported `function:` values
 
 - `openURL`
-- `shellCommand`
-- `openApp`
 - `copyToClipboard`
 - `revealInFinder`
 - `openFile`
@@ -210,17 +211,13 @@ entity_types: [json]
 - `saveTempFile`
 - `stripANSI`
 - `htmlToMarkdown`
-- `summarize`
-
-Notes:
-
-- `shellCommand` is a compatibility format. Built-in skills are migrated internally to safe typed functions.
-- `openApp` is allowlisted. Supported app names currently include ChatGPT, Claude, Cursor, Copilot, and Safari.
-- `openURL` only allows approved URL schemes such as `https`, `mailto`, `tel`, `sms`, `maps`, and `dict`.
+- `formatJSON`
+- `decodeBase64`
+- `decodeURL`
 
 #### Template variables
 
-The readable format supports:
+The readable format supports these variables in `template:` fields:
 
 - `{text}`
 - `{text:encoded}`
@@ -285,26 +282,24 @@ Each property may include:
 
 ### Supported parameter `source` values
 
-- `literal`
-- `clipboard`
-- `clipboardURL`
-- `filePaths`
-- `clipboardTrimmed`
-- `charCount`
-- `lineCount`
-
-`literal` uses the property's own `value`.
+- `literal` — uses the property's own `value`
+- `clipboard` — raw clipboard text
+- `clipboardLLM` — preprocessed clipboard text for LLM input (HTML extraction, chrome stripping, sanitization). **Use this for all prompt actions.**
+- `clipboardHTML` — raw clipboard HTML, falls back to plain text
+- `clipboardURL` — clipboard URL as a string
+- `clipboardTrimmed` — clipboard text with leading/trailing whitespace removed
+- `filePaths` — newline-joined file paths
+- `charCount` — character count as a string
+- `lineCount` — line count as a string
 
 ## Available `execute` Functions
 
-These are the currently supported structured tool functions.
-
 ### URLs and apps
 
-- `openURL`
-- `openURLTemplate`
-- `openStaticURL`
-- `openApp`
+- `openURL` — Open a validated clipboard URL directly.
+- `openURLTemplate` — Build a URL from `baseURL`, `path`, query parameters, and `fragment`.
+- `openStaticURL` — Open a fixed URL from parameters.
+- `openApp` — Open an allowlisted app and optionally copy prepared text to the clipboard. Supported apps include ChatGPT, Claude, Cursor, Copilot, and Safari.
 
 ### Files and clipboard
 
@@ -316,49 +311,60 @@ These are the currently supported structured tool functions.
 
 ### Local transforms
 
-- `formatJSON`
-- `decodeBase64`
-- `decodeURL`
-- `stripANSI`
-- `htmlToMarkdown`
+- `formatJSON` — Validate and pretty-print JSON.
+- `decodeBase64` — Decode Base64 and copy the result.
+- `decodeURL` — Decode percent-encoded text and copy the result.
+- `stripANSI` — Remove ANSI escape codes and copy the result.
+- `htmlToMarkdown` — Convert clipboard HTML to Markdown using the content extraction pipeline.
 
-### Path and host utilities
+### Path utilities
 
-- `revealPath`
-- `openInTerminal`
-- `ping`
+- `revealPath` — Resolve and validate a file path, then reveal it in Finder.
+- `openInTerminal` — Resolve and validate a file path, then open it in Terminal.
 
 ### AI tools
 
-- `llmPrompt`
-- `summarize`
+- `llmPrompt` — Run a prompt against the on-device LFM 2.5 model with separate system and user roles. The result is copied to the clipboard. Use `clipboardLLM` as the prompt source for best results.
 
 ## Function Reference
 
-### `openURL`
+### `llmPrompt`
 
-Open a validated clipboard URL directly.
-
-Example:
+The primary AI tool. Use this for summarization, translation, rewriting, grammar fixes, code explanation, and any other prompt-based transformation.
 
 ```json
 {
-  "execute": "openURL",
+  "execute": "llmPrompt",
   "parameters": {
     "type": "object",
     "properties": {
-      "url": { "type": "string", "description": "Clipboard URL", "source": "clipboardURL" }
+      "systemPrompt": {
+        "type": "string",
+        "description": "Instruction for the model",
+        "source": "literal",
+        "value": "Fix the grammar and spelling in the clipboard text. Preserve the original meaning and tone. Return only the corrected text."
+      },
+      "prompt": {
+        "type": "string",
+        "description": "Clipboard text",
+        "source": "clipboardLLM"
+      }
     },
-    "required": ["url"]
+    "required": ["systemPrompt", "prompt"]
   }
 }
 ```
 
+Tips for writing system prompts:
+
+- Be direct: "Fix grammar" not "You are a grammar assistant who..."
+- Specify what to return: "Return only the corrected text" prevents the model from adding commentary.
+- Keep it short: the on-device model responds better to concise instructions.
+- The input is truncated at ~3000 characters. For longer content, summarization works better than detailed rewriting.
+
 ### `openURLTemplate`
 
 Build a URL safely from `baseURL`, `path`, query parameters, and `fragment`.
-
-Example:
 
 ```json
 {
@@ -374,148 +380,98 @@ Example:
 }
 ```
 
-### `openApp`
+### `openURL`
 
-Open an allowlisted app and copy prepared text to the clipboard.
-
-Example:
+Open a validated clipboard URL directly.
 
 ```json
 {
-  "execute": "openApp",
+  "execute": "openURL",
   "parameters": {
     "type": "object",
     "properties": {
-      "appName": { "type": "string", "description": "Allowlisted app", "source": "literal", "value": "ChatGPT" },
-      "text": { "type": "string", "description": "Prompt text", "source": "clipboard", "prefix": "Summarize this text:\n\n" }
+      "url": { "type": "string", "description": "Clipboard URL", "source": "clipboardURL" }
     },
-    "required": ["appName", "text"]
+    "required": ["url"]
   }
 }
 ```
 
-### `copyToClipboard`
-
-Copy transformed or static text back to the clipboard.
-
-### `formatJSON`
-
-Validate and pretty-print JSON locally in process.
-
-### `decodeBase64`
-
-Decode Base64 locally and copy the result.
-
-### `decodeURL`
-
-Decode percent-encoded text locally and copy the result.
-
 ### `htmlToMarkdown`
 
-Convert clipboard HTML to Markdown.
-
-### `revealPath`
-
-Resolve and validate a file path, then reveal it in Finder.
-
-### `openInTerminal`
-
-Resolve and validate a file path, then open it in Terminal.
-
-### `ping`
-
-Validate a hostname or IP address, then run `/sbin/ping` with safe process arguments.
-
-### `llmPrompt`
-
-Run a prompt against the on-device model with separate system and user roles.
-
-Example:
+Convert clipboard HTML to Markdown. Uses the content extraction pipeline to strip navigation, ads, and boilerplate before converting.
 
 ```json
 {
-  "execute": "llmPrompt",
+  "execute": "htmlToMarkdown",
   "parameters": {
     "type": "object",
     "properties": {
-      "systemPrompt": {
-        "type": "string",
-        "description": "Rewrite instruction",
-        "source": "literal",
-        "value": "Rewrite the clipboard text as a polished Slack message. Keep it concise, clear, and conversational. Return only the rewritten message."
-      },
-      "prompt": {
-        "type": "string",
-        "description": "Clipboard text",
-        "source": "clipboard"
-      }
+      "html": { "type": "string", "description": "Clipboard HTML", "source": "clipboardHTML" }
     },
-    "required": ["systemPrompt", "prompt"]
+    "required": ["html"]
   }
 }
 ```
 
 ## Copy-Paste Examples
 
-### 1. Search the web
+### 1. Fix grammar (prompt)
 
 ```markdown
 ---
-name: search
-description: Search copied text on the web
+name: writing
+description: Fix and improve copied text
 metadata:
   content_types: [ text ]
 ---
 
-# Search
+# Writing
 
 ## Actions
 
-### search-web
+### fix-grammar
 
-type: function
-function: openURL
-template: https://duckduckgo.com/?q={text:encoded}
-icon: magnifyingglass
-description: Search the Web
+type: prompt
+prompt: Fix the grammar and spelling in the clipboard text. Preserve the original meaning and tone. Return only the corrected text.
+icon: textformat.abc
+description: Fix Grammar
 ```
 
-### 2. Open an address in Maps
+### 2. Summarize content (prompt)
 
 ```markdown
 ---
-name: places
-description: Open copied addresses in Maps
+name: summarize
+description: Summarize copied text
 metadata:
   content_types: [ text ]
-  entity_types: [ address ]
 ---
 
-# Places
+# Summarize
 
 ## Actions
 
-### open-maps
+### summarize
 
-type: function
-function: openURL
-template: maps://?address={text:encoded}
-icon: map
-description: Open in Maps
-entity_types: [address]
+type: prompt
+prompt: Summarize the clipboard text into 3-5 bullet points. Preserve the main point and the most important supporting details. Omit filler and repetition. Return only the summary.
+icon: text.redaction
+description: Summarize Content
 ```
 
-### 3. Rewrite an email answer draft
+### 3. Rewrite email draft (prompt, scoped to email apps)
 
 ```markdown
 ---
-name: rewrite
-description: Rewrite clipboard drafts with AI
+name: email
+description: Polish email drafts
 metadata:
   content_types: [ text ]
+  source_contexts: [ email ]
 ---
 
-# Rewrite
+# Email
 
 ## Actions
 
@@ -527,7 +483,30 @@ icon: envelope.badge
 description: Rewrite Email Draft
 ```
 
-### 4. Pretty-print JSON
+### 4. Strip ANSI codes (function, scoped to terminal)
+
+```markdown
+---
+name: terminal-tools
+description: Clean up terminal output
+metadata:
+  content_types: [ text ]
+  source_contexts: [ terminal ]
+---
+
+# Terminal Tools
+
+## Actions
+
+### strip-ansi
+
+type: function
+function: stripANSI
+icon: textformat
+description: Strip ANSI Codes
+```
+
+### 5. Format JSON (function, scoped to entity)
 
 ```markdown
 ---
@@ -545,73 +524,35 @@ metadata:
 ### pretty-json
 
 type: function
-function: shellCommand
-template: echo {text} | python3 -m json.tool | pbcopy
+function: formatJSON
 icon: curlybraces
 description: Pretty Print JSON
 entity_types: [json]
 ```
 
-### 5. Ping an IP address safely
-
-Structured tool form:
-
-````markdown
----
-name: network
-description: Network helpers
-metadata:
-  content_types: [ text ]
-  entity_types: [ ipAddress ]
----
-
-# Network
-
-## Tools
-
-```json
-[
-  {
-    "id": "ping-host",
-    "name": "Ping",
-    "description": "Ping",
-    "icon": "antenna.radiowaves.left.and.right",
-    "execute": "ping",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "host": { "type": "string", "description": "Hostname or IP", "source": "clipboardTrimmed" }
-      },
-      "required": ["host"]
-    },
-    "entityTypes": ["ipAddress"]
-  }
-]
-```
-````
-
 ## Built-in Skills
 
-CopyCopy ships with a small default set of built-ins, including:
+CopyCopy ships with these built-in skills:
 
-- `urls`
-- `files`
-- `images`
-- `text`
-- `places`
-- `code`
-- `transform`
-- `filesystem`
+- `urls` — Open copied URLs
+- `files` — Open or reveal copied files
+- `images` — Save clipboard images
+- `text` — Search the web, convert HTML to Markdown
+- `places` — Open addresses and coordinates in Maps
+- `code` — Format JSON, decode Base64/URL encoding, open as temp file
+- `transform` — Summarize, translate, rewrite email/Slack, fix grammar (on-device LLM)
+- `filesystem` — Reveal file paths in Finder, open in Terminal
 
-On startup, these are exported to `~/.copycopy/skills/` as readable Markdown files. That export is a good source of examples.
+On startup, these are exported to `~/.copycopy/skills/` as readable Markdown files.
 
 ## Tips
 
 - Start from an exported built-in skill instead of writing one from scratch.
-- Keep one skill focused on one job.
-- Use `entity_types` aggressively. It keeps the action panel cleaner.
-- Prefer `type: prompt` for rewrites and summaries.
-- Prefer `openURL` or `openURLTemplate` over shell commands when possible.
+- Use `type: prompt` for AI-powered actions. Use `type: function` for everything else.
+- Use `source_contexts` to surface actions in the right app context.
+- Use `entity_types` to keep the action panel clean.
+- Use `clipboardLLM` as the source for prompt actions — it preprocesses the input.
+- Keep system prompts short and direct.
 - Restart CopyCopy after changing `SKILL.md`.
 
 ## Troubleshooting
@@ -643,4 +584,4 @@ Enable the Debug tab:
 defaults write com.copycopy.app debugMenuEnabled -bool true
 ```
 
-Then relaunch CopyCopy and inspect the current clipboard kind, detected entity, and event-tap state.
+Then relaunch CopyCopy and inspect the current clipboard kind, detected entity, source context, and event-tap state.

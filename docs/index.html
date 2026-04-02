@@ -3,129 +3,252 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>CopyCopy_</title>
+    <title>CopyCopy — Smart clipboard actions for macOS</title>
     <meta
       name="description"
-      content="Double ⌘C, instant clipboard skills. Native, local, and fast."
+      content="Double-press ⌘C to rewrite emails, summarize articles, format JSON, and more. On-device AI, nothing leaves your Mac."
     />
     <link rel="canonical" href="https://copycopy.app/" />
 
-    <!-- Open Graph -->
     <meta property="og:title" content="CopyCopy" />
     <meta
       property="og:description"
-      content="Double ⌘C, instant clipboard skills. Native, local, and fast."
+      content="Double-press ⌘C to rewrite emails, summarize articles, format JSON, and more. On-device AI, nothing leaves your Mac."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://copycopy.app/" />
-    <meta name="theme-color" content="#050505" />
+    <meta name="theme-color" content="#fafaf8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#141413" media="(prefers-color-scheme: dark)" />
 
     <link rel="stylesheet" href="./site.css" />
   </head>
   <body>
-    
-    <!-- Global Nav -->
-    <nav class="global-nav">
-      <div class="nav-content">
-        <a href="/" class="nav-logo">CopyCopy_</a>
-        <div class="nav-links">
-          <a href="./actions.html" class="nav-link">DOCS</a>
-          <a href="https://github.com/mpuig/copycopy" class="nav-link">SRC</a>
-          <a href="https://github.com/mpuig/copycopy/releases/latest" class="nav-link">CHANGELOG</a>
+
+    <!-- Nav -->
+    <nav class="nav">
+      <div class="nav__inner">
+        <a href="/" class="nav__logo">CopyCopy</a>
+        <div class="nav__links">
+          <a href="./actions.html" class="nav__link">Docs</a>
+          <a href="https://github.com/mpuig/copycopy" class="nav__link">Source</a>
+          <a href="https://github.com/mpuig/copycopy/releases/latest" class="nav__link">Releases</a>
         </div>
       </div>
     </nav>
 
     <main>
-      <!-- Hero Section -->
+
+      <!-- Hero -->
       <section class="hero container">
-        <div class="animate-in">
-          <h1>Double ⌘C<br>Run Skills.</h1>
-          <p style="max-width: 600px;">
-            CopyCopy monitors your clipboard content. <br>
-            Trigger: Double-Copy.<br>
-            Payload: Context-aware skills. <br>
-            Status: Native, Local, Fast.
-          </p>
-          
-          <div class="hero-buttons">
-            <a class="btn btn-primary" href="https://github.com/mpuig/copycopy/releases/latest">DOWNLOAD</a>
-            <a class="btn btn-secondary" href="https://github.com/mpuig/copycopy">VIEW_SOURCE</a>
-          </div>
-          <p class="req-text">macOS 14+ (Sonoma) • Apple Silicon & Intel</p>
+        <p class="hero__eyebrow animate-in">Double ⌘C</p>
+        <h1 class="hero__title animate-in animate-in--delay-1">
+          Copy anything.<br>Get the smart action.
+        </h1>
+        <p class="hero__subtitle animate-in animate-in--delay-2">
+          CopyCopy understands what you copy and where you copied it from, then offers the right action — rewrite, summarize, format, translate — all on-device.
+        </p>
+        <div class="hero__actions animate-in animate-in--delay-3">
+          <a class="btn btn--primary" href="https://github.com/mpuig/copycopy/releases/latest">Download</a>
+          <a class="btn btn--secondary" href="https://github.com/mpuig/copycopy">View Source</a>
+        </div>
+        <p class="hero__req animate-in animate-in--delay-4">macOS 14+ (Sonoma) · Apple Silicon & Intel · MIT License</p>
+      </section>
+
+      <!-- Problem -->
+      <section class="problem container">
+        <div class="problem__grid">
+          <h2 class="problem__heading">
+            You copy things all day.<br>
+            Then you <em>work around</em> your clipboard.
+          </h2>
+          <ul class="problem__list">
+            <li class="problem__item">Paste from a webpage and manually clean the formatting</li>
+            <li class="problem__item">Open Google Translate in a separate tab</li>
+            <li class="problem__item">Switch to a JSON formatter to make it readable</li>
+            <li class="problem__item">Rewrite that email draft one more time before sending</li>
+            <li class="problem__item">Strip terminal color codes before sharing output</li>
+          </ul>
         </div>
       </section>
 
-      <!-- Features Section (Bento Grid) -->
-      <section class="features-section">
+      <!-- How it works -->
+      <section class="how">
         <div class="container">
-          <div class="section-header">
-            <h2>> Features</h2>
-            <p>Optimized for developer workflow. Minimal latency.</p>
-          </div>
-
-          <div class="bento-grid">
-            <!-- Feature 1: Context Aware (Full Width) -->
-            <div class="bento-item bento-full">
-              <h3>Context Aware</h3>
-              <p>Clipboard content determines which skills show up:</p>
-              <pre style="background: var(--bg-primary); padding: 20px; border: 1px solid var(--border); font-size: 14px; color: var(--accent); line-height: 1.6; overflow-x: auto;">
-CONTENT        SKILL
--------        -----
-URL            -> OPEN
-FILE           -> REVEAL
-IMAGE          -> SAVE
-PLAIN_TEXT     -> SEARCH / REWRITE / FORMAT</pre>
+          <p class="how__label">How it works</p>
+          <div class="how__steps">
+            <div class="step">
+              <div class="step__number">1</div>
+              <p class="step__title">Copy</p>
+              <p class="step__desc">Copy anything with ⌘C as you normally do.</p>
             </div>
-
-            <!-- Feature 2: Privacy -->
-            <div class="bento-item">
-              <h3>Privacy First</h3>
-              <p>
-                Analytics: DISABLED.<br>
-                Tracking: DISABLED.<br>
-                History: NULL.<br>
-                Local execution environment only.
-              </p>
+            <div class="step">
+              <div class="step__number">2</div>
+              <p class="step__title">Double-press</p>
+              <p class="step__desc">Press ⌘C again. A floating panel appears near your cursor.</p>
             </div>
-
-                        <!-- Feature 3: Custom Skills -->
-                        <div class="bento-item">
-                          <h3>Custom Skills</h3>
-                          <p>Create or override <code>SKILL.md</code> files in <code>~/.copycopy/skills/</code>. Use readable action blocks or structured JSON tools.</p>
+            <div class="step">
+              <div class="step__number">3</div>
+              <p class="step__title">Pick an action</p>
+              <p class="step__desc">Choose from context-aware suggestions. The result lands in your clipboard.</p>
             </div>
-
-             <!-- Feature 4: Native -->
-             <div class="bento-item">
-                <h3>Native SwiftUI</h3>
-                <p>
-                  Compiled binary size < 15MB. 
-                  Memory footprint: Negligible.
-                  Framework: SwiftUI.
-                </p>
-              </div>
-
-               <!-- Feature 5: Open Source -->
-            <div class="bento-item">
-                <h3>MIT License</h3>
-                <p>
-                  Repository access granted. Fork allowed.
-                </p>
-              </div>
           </div>
         </div>
       </section>
+
+      <!-- Scenarios -->
+      <section class="scenarios container">
+        <h2 class="scenarios__heading">It knows what you need</h2>
+        <div class="scenarios__grid">
+
+          <div class="scenario">
+            <span class="scenario__source">Copied from Mail</span>
+            <div class="scenario__content">"Hey, just wanted to follow up on the thing we discussed re: the timeline for..."</div>
+            <div class="scenario__arrow">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+              CopyCopy suggests
+            </div>
+            <div class="scenario__action">Rewrite Email Draft</div>
+          </div>
+
+          <div class="scenario">
+            <span class="scenario__source">Copied from Safari</span>
+            <div class="scenario__content">&lt;article class="post"&gt;&lt;h1&gt;Understanding Transformers&lt;/h1&gt;...</div>
+            <div class="scenario__arrow">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+              CopyCopy suggests
+            </div>
+            <div class="scenario__action">HTML to Markdown</div>
+          </div>
+
+          <div class="scenario">
+            <span class="scenario__source">Copied from VS Code</span>
+            <div class="scenario__content">{"users":[{"id":1,"name":"Alice","role":"admin"},{"id":2...</div>
+            <div class="scenario__arrow">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+              CopyCopy suggests
+            </div>
+            <div class="scenario__action">Pretty Print JSON</div>
+          </div>
+
+          <div class="scenario">
+            <span class="scenario__source">Copied from Terminal</span>
+            <div class="scenario__content"><span style="opacity: 0.6">[0;32m</span>PASS<span style="opacity: 0.6">[0m</span> tests/auth.test.ts (2.41s) ✓ validates token...</div>
+            <div class="scenario__arrow">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+              CopyCopy suggests
+            </div>
+            <div class="scenario__action">Strip ANSI Codes</div>
+          </div>
+
+          <div class="scenario">
+            <span class="scenario__source">Copied from Slack</span>
+            <div class="scenario__content">The meeting notes from today: we agreed to push the release to next sprint and...</div>
+            <div class="scenario__arrow">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+              CopyCopy suggests
+            </div>
+            <div class="scenario__action">Summarize Content</div>
+          </div>
+
+          <div class="scenario">
+            <span class="scenario__source">Copied foreign text</span>
+            <div class="scenario__content">Les modifications apportées au système de gestion des données permettent une...</div>
+            <div class="scenario__arrow">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+              CopyCopy suggests
+            </div>
+            <div class="scenario__action">Translate</div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section class="features container">
+        <p class="features__label">Built for this</p>
+        <div class="features__grid">
+
+          <div class="feature">
+            <p class="feature__title">On-device AI</p>
+            <p class="feature__desc">Summarize, translate, rewrite, and fix grammar using the local LFM 2.5 model. No API keys. No cloud calls.</p>
+          </div>
+
+          <div class="feature">
+            <p class="feature__title">Source-aware</p>
+            <p class="feature__desc">Detects if you copied from email, chat, browser, IDE, or terminal — and ranks actions accordingly.</p>
+          </div>
+
+          <div class="feature">
+            <p class="feature__title">Instant transforms</p>
+            <p class="feature__desc">Format JSON, decode Base64, strip ANSI, convert HTML to Markdown. No network, no waiting.</p>
+          </div>
+
+          <div class="feature">
+            <p class="feature__title">Content extraction</p>
+            <p class="feature__desc">Strips ads, navigation, and boilerplate from web pages before converting. Clean Markdown every time.</p>
+          </div>
+
+          <div class="feature">
+            <p class="feature__title">Extensible</p>
+            <p class="feature__desc">Create custom SKILL.md files with your own prompt actions or URL templates. Override any built-in.</p>
+          </div>
+
+          <div class="feature">
+            <p class="feature__title">Native & lightweight</p>
+            <p class="feature__desc">SwiftUI menu bar app. Under 15 MB. No Electron, no web views, no background daemon.</p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Privacy -->
+      <section class="privacy">
+        <div class="container">
+          <h2 class="privacy__heading">Your clipboard stays yours</h2>
+          <p class="privacy__desc">
+            CopyCopy runs entirely on your Mac. AI processing happens on-device using Apple's MLX framework. Nothing is sent to any server, ever.
+          </p>
+          <div class="privacy__points">
+            <span class="privacy__point">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 9.5l3 3 7-7"/></svg>
+              No telemetry
+            </span>
+            <span class="privacy__point">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 9.5l3 3 7-7"/></svg>
+              No clipboard history
+            </span>
+            <span class="privacy__point">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 9.5l3 3 7-7"/></svg>
+              No network calls
+            </span>
+            <span class="privacy__point">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 9.5l3 3 7-7"/></svg>
+              Open source
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- CTA -->
+      <section class="cta container">
+        <h2 class="cta__heading">Stop working around<br>your clipboard</h2>
+        <p class="cta__desc">Download CopyCopy and double-press ⌘C to get started.</p>
+        <div class="cta__actions">
+          <a class="btn btn--primary" href="https://github.com/mpuig/copycopy/releases/latest">Download</a>
+          <a class="btn btn--secondary" href="./actions.html">Read the docs</a>
+        </div>
+        <p class="cta__req">macOS 14+ (Sonoma) · Apple Silicon & Intel · Free & open source</p>
+      </section>
+
     </main>
 
     <!-- Footer -->
-    <footer>
-      <div class="container footer-content">
-        <div class="copyright">
-          © 2026 Marc Puig.
-        </div>
-        <div class="footer-links">
-            <a href="https://github.com/mpuig/copycopy">GITHUB</a>
-            <a href="https://github.com/mpuig">@MPUIG</a>
+    <footer class="footer">
+      <div class="container footer__inner">
+        <span>&copy; 2026 Marc Puig</span>
+        <div class="footer__links">
+          <a href="https://github.com/mpuig/copycopy">GitHub</a>
+          <a href="https://github.com/mpuig">@mpuig</a>
         </div>
       </div>
     </footer>
