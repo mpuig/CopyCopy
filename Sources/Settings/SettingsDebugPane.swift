@@ -30,11 +30,15 @@ struct SettingsDebugPane: View {
                     VStack(alignment: .leading, spacing: 8) {
                         if let ctx = model.lastClipboardContext {
                             statusRow("Content Type", value: ctx.snapshot.kind.rawValue)
+                            statusRow("Representation", value: ctx.snapshot.representationKind.rawValue)
                             statusRow("Summary", value: ctx.snapshot.summary)
                             let entities = ctx.snapshot.detectedEntities.map(\.displayName).joined(separator: ", ")
                             statusRow("Detected Tags", value: entities.isEmpty ? "None" : entities)
                             if let appName = ctx.copyEvent?.appName {
                                 statusRow("Source App", value: appName)
+                            }
+                            if let bundleID = ctx.copyEvent?.bundleID {
+                                statusRow("Source Bundle ID", value: bundleID)
                             }
                             statusRow("Source Context", value: String(describing: ctx.sourceAppContext))
                         } else {

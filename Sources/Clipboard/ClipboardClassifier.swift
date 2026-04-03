@@ -3,12 +3,16 @@ import NaturalLanguage
 
 final class ClipboardClassifier {
     func snapshot(from pasteboard: NSPasteboard, changeCount: Int) -> ClipboardSnapshot {
+        let html = readHTML(from: pasteboard)
+        let htmlPreference = html.map(classifyHTMLPreference)
+
         if let fileURLs = readFileURLs(from: pasteboard), !fileURLs.isEmpty {
             let exts = Set(fileURLs.map { $0.pathExtension.lowercased() }.filter { !$0.isEmpty })
             let extSummary = exts.isEmpty ? "" : " (\(exts.sorted().joined(separator: ", ")))"
             return ClipboardSnapshot(
                 changeCount: changeCount,
                 kind: .fileURLs,
+                representationKind: .nonText,
                 summary: "\(fileURLs.count) file(s)\(extSummary)",
                 fileURLs: fileURLs
             )
@@ -19,6 +23,7 @@ final class ClipboardClassifier {
             return ClipboardSnapshot(
                 changeCount: changeCount,
                 kind: .url,
+                representationKind: .nonText,
                 summary: "URL\(host)",
                 url: url
             )
@@ -29,6 +34,7 @@ final class ClipboardClassifier {
             return ClipboardSnapshot(
                 changeCount: changeCount,
                 kind: .image,
+                representationKind: .nonText,
                 summary: "Image \(size)"
             )
         }
@@ -37,6 +43,7 @@ final class ClipboardClassifier {
         // We prefer plain text to preserve code, JSON, etc.
         if let text = pasteboard.string(forType: .string), !text.isEmpty {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let richTextType = htmlPreference == .semanticWebContent ? NSPasteboard.PasteboardType.html : nil
 
             // Check if text looks like a URL (single line, URL-like pattern)
             if !trimmed.contains("\n"), let detectedURL = detectURL(from: trimmed) {
@@ -44,6 +51,7 @@ final class ClipboardClassifier {
                 return ClipboardSnapshot(
                     changeCount: changeCount,
                     kind: .url,
+                    representationKind: .nonText,
                     summary: "URL\(host)",
                     url: detectedURL,
                     plainText: trimmed
@@ -52,21 +60,167 @@ final class ClipboardClassifier {
 
             // Detect entities (phone, date, address) and named entities (name, place, org)
             let entity = detectEntity(from: trimmed)
-            let entitySuffix = entity != .none ? " • \(entity.displayName)" : ""
+            var entities = entity == .none ? [] : [entity]
+            if htmlPreference == .semanticWebContent {
+                entities.append(.html)
+            }
+
+            let entitySuffix = entities.isEmpty ? "" : " • " + entities.map(\.displayName).joined(separator: ", ")
 
             let short = trimmed.count > 140 ? String(trimmed.prefix(140)) + "…" : trimmed
             return ClipboardSnapshot(
                 changeCount: changeCount,
                 kind: .plainText,
+                representationKind: representationKind(
+                    semanticHTMLSelected: htmlPreference == .semanticWebContent,
+                    htmlOffered: html != nil
+                ),
                 summary: "Text (\(trimmed.count) chars)\(entitySuffix): \(short)",
                 plainText: trimmed,
-                detectedEntity: entity
+                htmlText: htmlPreference == .semanticWebContent ? html : nil,
+                richTextType: richTextType,
+                detectedEntities: entities
+            )
+        }
+
+        if htmlPreference == .semanticWebContent, let html {
+            let plainText = plainTextFromHTML(html)
+            return ClipboardSnapshot(
+                changeCount: changeCount,
+                kind: .richText,
+                representationKind: .semanticHTML,
+                summary: "Rich text",
+                plainText: plainText,
+                htmlText: html,
+                richTextType: .html,
+                detectedEntities: [.html]
+            )
+        }
+
+        if let text = plainTextFromRTFRepresentation(from: pasteboard), !text.isEmpty {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let entity = detectEntity(from: trimmed)
+            let entities = entity == .none ? [] : [entity]
+            let entitySuffix = entities.isEmpty ? "" : " • " + entities.map(\.displayName).joined(separator: ", ")
+            let short = trimmed.count > 140 ? String(trimmed.prefix(140)) + "…" : trimmed
+
+            return ClipboardSnapshot(
+                changeCount: changeCount,
+                kind: .plainText,
+                representationKind: .richText,
+                summary: "Text (\(trimmed.count) chars)\(entitySuffix): \(short)",
+                plainText: trimmed,
+                detectedEntities: entities
             )
         }
 
         let types = pasteboard.types?.map(\.rawValue).sorted() ?? []
         let typeSummary = types.isEmpty ? "Unknown content" : "Unknown types: \(types.prefix(5).joined(separator: ", "))"
-        return ClipboardSnapshot(changeCount: changeCount, kind: .unknown, summary: typeSummary)
+        return ClipboardSnapshot(
+            changeCount: changeCount,
+            kind: .unknown,
+            representationKind: .nonText,
+            summary: typeSummary
+        )
+    }
+
+    private func readHTML(from pasteboard: NSPasteboard) -> String? {
+        guard let html = pasteboard.string(forType: .html)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !html.isEmpty else {
+            return nil
+        }
+        return html
+    }
+
+    private func plainTextFromRTFRepresentation(from pasteboard: NSPasteboard) -> String? {
+        if let rtfData = pasteboard.data(forType: .rtf),
+           let attributed = try? NSAttributedString(
+                data: rtfData,
+                options: [.documentType: NSAttributedString.DocumentType.rtf],
+                documentAttributes: nil
+           ) {
+            return attributed.string
+        }
+
+        if let rtfdData = pasteboard.data(forType: .rtfd),
+           let attributed = try? NSAttributedString(
+                data: rtfdData,
+                options: [.documentType: NSAttributedString.DocumentType.rtfd],
+                documentAttributes: nil
+           ) {
+            return attributed.string
+        }
+
+        return nil
+    }
+
+    private func plainTextFromHTML(_ html: String) -> String {
+        guard let data = html.data(using: .utf8),
+              let attributed = try? NSAttributedString(
+                data: data,
+                options: [.documentType: NSAttributedString.DocumentType.html],
+                documentAttributes: nil
+              ) else {
+            return html
+        }
+
+        return attributed.string.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func classifyHTMLPreference(_ html: String) -> HTMLPreference {
+        let normalized = html.lowercased()
+        var score = 0
+
+        let strongSemanticTags = ["<article", "<main", "<section"]
+        let documentTags = ["<p", "<a ", "<ul", "<ol", "<table", "<blockquote", "<h1", "<h2", "<h3"]
+        let editorTags = ["<pre", "<code"]
+        let editorHints = [
+            "white-space: pre", "jetbrains mono", "menlo", "monaco", "courier new",
+            "sf mono", "monospace", "background-color:", "sourcecodepro", "fira code"
+        ]
+
+        score += strongSemanticTags.reduce(0) { partial, token in
+            partial + (normalized.contains(token) ? 3 : 0)
+        }
+        score += documentTags.reduce(0) { partial, token in
+            partial + (normalized.contains(token) ? 2 : 0)
+        }
+        score -= editorTags.reduce(0) { partial, token in
+            partial + (normalized.contains(token) ? 3 : 0)
+        }
+        score -= editorHints.reduce(0) { partial, token in
+            partial + (normalized.contains(token) ? 2 : 0)
+        }
+
+        if countOccurrences(of: "<span", in: normalized) >= 8 {
+            score -= 2
+        }
+        if countOccurrences(of: "style=", in: normalized) >= 6 {
+            score -= 2
+        }
+
+        if normalized.contains("org.chromium") || normalized.contains("jetbrains") {
+            score -= 2
+        }
+
+        return score > 0 ? .semanticWebContent : .editorOrAmbiguous
+    }
+
+    private func countOccurrences(of token: String, in text: String) -> Int {
+        text.components(separatedBy: token).count - 1
+    }
+
+    private func representationKind(
+        semanticHTMLSelected: Bool,
+        htmlOffered: Bool
+    ) -> ClipboardRepresentationKind {
+        if semanticHTMLSelected {
+            return .semanticHTML
+        }
+        if htmlOffered {
+            return .styledText
+        }
+        return .plainText
     }
 
     private func readFileURLs(from pasteboard: NSPasteboard) -> [URL]? {
@@ -408,4 +562,9 @@ final class ClipboardClassifier {
         let range = NSRange(text.startIndex..., in: text)
         return regex.firstMatch(in: text, options: [], range: range) != nil
     }
+}
+
+private enum HTMLPreference {
+    case semanticWebContent
+    case editorOrAmbiguous
 }

@@ -14,6 +14,8 @@ let package = Package(
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "2.0.0"),
         .package(url: "https://github.com/orchetect/MenuBarExtraAccess", from: "1.2.2"),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "2.21.0"),
+        .package(url: "https://github.com/jaredhowland/html-to-markdown-swift.git", from: "0.9.0"),
+        .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.13.4"),
     ],
     targets: [
         .executableTarget(
@@ -23,6 +25,8 @@ let package = Package(
                 .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
                 .product(name: "MenuBarExtraAccess", package: "MenuBarExtraAccess"),
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "HTMLToMarkdown", package: "html-to-markdown-swift"),
+                .product(name: "SwiftSoup", package: "SwiftSoup"),
             ],
             path: "Sources",
             linkerSettings: [
@@ -38,4 +42,3 @@ let package = Package(
         )
     ]
 )
-

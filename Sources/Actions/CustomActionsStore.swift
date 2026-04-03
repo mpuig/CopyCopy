@@ -134,7 +134,7 @@ final class CustomActionsStore: ObservableObject {
             completion?("Opened file", false)
         case .copyToClipboard:
             executeCopyToClipboard(processedTemplate)
-            completion?("Copied to clipboard", true)
+            completion?(processedTemplate, true)
         case .saveImage:
             executeSaveImage()
             completion?("Image saved", false)
@@ -303,122 +303,27 @@ final class CustomActionsStore: ObservableObject {
     }
 
     private func executeHtmlToMarkdown(_ html: String, completion: ActionCompletion? = nil) {
-        _ = Task.detached { [weak self] in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["pandoc", "-f", "html", "-t", "markdown", "--wrap=none"]
-
-            let inputPipe = Pipe()
-            let outputPipe = Pipe()
-            process.standardInput = inputPipe
-            process.standardOutput = outputPipe
-
+        _ = Task.detached {
             do {
-                try process.run()
-
-                if let data = html.data(using: .utf8) {
-                    inputPipe.fileHandleForWriting.write(data)
-                    inputPipe.fileHandleForWriting.closeFile()
-                }
-
-                process.waitUntilExit()
-
-                if process.terminationStatus == 0 {
-                    let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
-                    if let markdown = String(data: data, encoding: .utf8) {
-                        await MainActor.run {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(markdown, forType: .string)
-                            completion?("Converted to Markdown", true)
-                        }
-                        return
-                    }
+                let markdown = try await HTMLMarkdownConverter.convertAsync(html)
+                await MainActor.run {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(markdown, forType: .string)
+                    completion?("Converted to Markdown", true)
                 }
             } catch {
-                Logger.debug("Pandoc not available, using fallback: \(error)", category: .actions)
-            }
-
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                let markdown = self.simpleHtmlToMarkdown(html)
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(markdown, forType: .string)
-                completion?("Converted to Markdown", true)
+                await MainActor.run {
+                    Logger.error("HTML to Markdown conversion failed: \(error)", category: .actions)
+                    completion?("Failed: \(error.localizedDescription)", false)
+                }
             }
         }
-    }
-    
-    private func simpleHtmlToMarkdown(_ html: String) -> String {
-        // Simple HTML to Markdown conversion
-        var markdown = html
-        
-        // Remove script and style tags with their content
-        let scriptPattern = "<script[^>]*>[\\s\\S]*?</script>"
-        if let regex = try? NSRegularExpression(pattern: scriptPattern, options: .caseInsensitive) {
-            markdown = regex.stringByReplacingMatches(in: markdown, range: NSRange(markdown.startIndex..., in: markdown), withTemplate: "")
-        }
-        
-        let stylePattern = "<style[^>]*>[\\s\\S]*?</style>"
-        if let regex = try? NSRegularExpression(pattern: stylePattern, options: .caseInsensitive) {
-            markdown = regex.stringByReplacingMatches(in: markdown, range: NSRange(markdown.startIndex..., in: markdown), withTemplate: "")
-        }
-        
-        // Convert headers
-        for i in (1...6).reversed() {
-            let pattern = "<h\\(i)[^>]*>([^<]*)</h\\(i)>"
-            let replacement = String(repeating: "#", count: i) + " $2"
-            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
-                markdown = regex.stringByReplacingMatches(in: markdown, range: NSRange(markdown.startIndex..., in: markdown), withTemplate: replacement)
-            }
-        }
-        
-        // Convert bold and italic
-        markdown = markdown.replacingOccurrences(of: "<strong[^>]*>([^<]*)</strong>", with: "**$1**", options: .regularExpression)
-        markdown = markdown.replacingOccurrences(of: "<b[^>]*>([^<]*)</b>", with: "**$1**", options: .regularExpression)
-        markdown = markdown.replacingOccurrences(of: "<em[^>]*>([^<]*)</em>", with: "*$1*", options: .regularExpression)
-        markdown = markdown.replacingOccurrences(of: "<i[^>]*>([^<]*)</i>", with: "*$1*", options: .regularExpression)
-        
-        // Convert links
-        markdown = markdown.replacingOccurrences(of: "<a[^>]+href=\"([^\"]+)\"[^>]*>([^<]*)</a>", with: "[$2]($1)", options: .regularExpression)
-        
-        // Convert images
-        markdown = markdown.replacingOccurrences(of: "<img[^>]+src=\"([^\"]+)\"[^>]*alt=\"([^\"]*)\"[^>]*>", with: "![$2]($1)", options: .regularExpression)
-        markdown = markdown.replacingOccurrences(of: "<img[^>]+alt=\"([^\"]*)\"[^>]+src=\"([^\"]+)\"[^>]*>", with: "![$1]($2)", options: .regularExpression)
-        markdown = markdown.replacingOccurrences(of: "<img[^>]+src=\"([^\"]+)\"[^>]*>", with: "![]($1)", options: .regularExpression)
-        
-        // Convert lists
-        markdown = markdown.replacingOccurrences(of: "<li[^>]*>([^<]*)</li>", with: "- $1", options: .regularExpression)
-        
-        // Convert paragraphs
-        markdown = markdown.replacingOccurrences(of: "<p[^>]*>([^<]*)</p>", with: "\n\n$1\n\n", options: .regularExpression)
-        
-        // Convert line breaks
-        markdown = markdown.replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
-        
-        // Remove remaining HTML tags
-        let tagPattern = "<[^>]+>"
-        if let regex = try? NSRegularExpression(pattern: tagPattern) {
-            markdown = regex.stringByReplacingMatches(in: markdown, range: NSRange(markdown.startIndex..., in: markdown), withTemplate: "")
-        }
-        
-        // Clean up multiple newlines
-        markdown = markdown.replacingOccurrences(of: "\n\\s*\n\\s*\n", with: "\n\n", options: .regularExpression)
-        
-        // Decode HTML entities
-        markdown = markdown.replacingOccurrences(of: "&lt;", with: "<")
-        markdown = markdown.replacingOccurrences(of: "&gt;", with: ">")
-        markdown = markdown.replacingOccurrences(of: "&amp;", with: "&")
-        markdown = markdown.replacingOccurrences(of: "&quot;", with: "\"")
-        markdown = markdown.replacingOccurrences(of: "&#39;", with: "'")
-        markdown = markdown.replacingOccurrences(of: "&nbsp;", with: " ")
-        
-        return markdown.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func executeSummarize(_ text: String, completion: ActionCompletion? = nil) {
         let contentToSummarize: String
         if text.contains("<") && text.contains(">") {
-            contentToSummarize = simpleHtmlToMarkdown(text)
+            contentToSummarize = HTMLMarkdownConverter.plainText(text)
         } else {
             contentToSummarize = text
         }

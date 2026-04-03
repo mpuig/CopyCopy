@@ -120,6 +120,56 @@ final class ClipboardClassifierTests: XCTestCase {
         XCTAssertEqual(classifier.detectEntity(from: html), .html)
     }
 
+    func testSnapshotKeepsPlainTextAndRecordsHTMLRepresentation() {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+        pasteboard.declareTypes([.string, .html], owner: nil)
+        pasteboard.setString("Hello world", forType: .string)
+        pasteboard.setString("<article><p>Hello <strong>world</strong></p></article>", forType: .html)
+
+        let snapshot = classifier.snapshot(from: pasteboard, changeCount: 1)
+
+        XCTAssertEqual(snapshot.kind, .plainText)
+        XCTAssertEqual(snapshot.representationKind, .semanticHTML)
+        XCTAssertEqual(snapshot.richTextType, .html)
+        XCTAssertEqual(snapshot.plainText, "Hello world")
+        XCTAssertEqual(snapshot.htmlText, "<article><p>Hello <strong>world</strong></p></article>")
+        XCTAssertEqual(snapshot.detectedEntities, [.html])
+    }
+
+    func testSnapshotDoesNotTagCodeAsHTMLWhenHTMLRepresentationExists() {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+        pasteboard.declareTypes([.string, .html], owner: nil)
+        pasteboard.setString("func greet() {}", forType: .string)
+        pasteboard.setString("<pre><span>func</span> greet() {}</pre>", forType: .html)
+
+        let snapshot = classifier.snapshot(from: pasteboard, changeCount: 1)
+
+        XCTAssertEqual(snapshot.kind, .plainText)
+        XCTAssertEqual(snapshot.representationKind, .styledText)
+        XCTAssertNil(snapshot.richTextType)
+        XCTAssertNil(snapshot.htmlText)
+        XCTAssertEqual(snapshot.detectedEntities, [.codeSnippet])
+    }
+
+    func testSnapshotConvertsRTFOnlyContentToPlainText() throws {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+        let attributed = NSAttributedString(string: "Hello from RTF")
+        let rtf = try XCTUnwrap(attributed.data(from: NSRange(location: 0, length: attributed.length), documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]))
+
+        pasteboard.declareTypes([.rtf], owner: nil)
+        XCTAssertTrue(pasteboard.setData(rtf, forType: .rtf))
+
+        let snapshot = classifier.snapshot(from: pasteboard, changeCount: 1)
+
+        XCTAssertEqual(snapshot.kind, .plainText)
+        XCTAssertEqual(snapshot.plainText, "Hello from RTF")
+    }
+
+    func testDetectCatalanAddressEntity() {
+        let address = "Urb. Port del Comte, 25284, La Coma i la Pedra (Lleida)"
+        XCTAssertEqual(classifier.detectEntity(from: address), .address)
+    }
+
     func testDetectCodeSnippetEntity() {
         let codeSnippets = ["func test() {}", "const x = 1;", "import Foundation"]
         for code in codeSnippets {

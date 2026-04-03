@@ -60,6 +60,9 @@ enum ActionType: String, Codable, CaseIterable, Identifiable {
 enum SourceContextFilter: String, Codable, CaseIterable, Identifiable {
     case any = "any"
     case browser = "browser"
+    case email = "email"
+    case chat = "chat"
+    case notes = "notes"
     case ide = "ide"
     case terminal = "terminal"
 
@@ -69,6 +72,9 @@ enum SourceContextFilter: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .any: return "Any App"
         case .browser: return "Browser"
+        case .email: return "Email"
+        case .chat: return "Chat"
+        case .notes: return "Notes"
         case .ide: return "IDE"
         case .terminal: return "Terminal"
         }
@@ -78,6 +84,9 @@ enum SourceContextFilter: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .any: return true
         case .browser: return context == .browser
+        case .email: return context == .email
+        case .chat: return context == .chat
+        case .notes: return context == .notes
         case .ide: return context == .ide
         case .terminal: return context == .terminal
         }

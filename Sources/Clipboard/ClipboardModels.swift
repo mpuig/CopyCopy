@@ -9,6 +9,14 @@ enum ClipboardContentKind: String {
     case unknown
 }
 
+enum ClipboardRepresentationKind: String {
+    case semanticHTML
+    case styledText
+    case plainText
+    case richText
+    case nonText
+}
+
 enum DetectedEntityType: String, Codable {
     case none
     // NLTagger entities
@@ -87,6 +95,9 @@ enum DetectedEntityType: String, Codable {
 
 enum SourceAppContext {
     case terminal
+    case email
+    case chat
+    case notes
     case ide
     case browser
     case other
@@ -94,6 +105,12 @@ enum SourceAppContext {
     init(bundleIdentifier: String?, appName: String?) {
         if TerminalAppIdentifiers.isTerminal(bundleIdentifier: bundleIdentifier, appName: appName) {
             self = .terminal
+        } else if EmailAppIdentifiers.isEmail(bundleIdentifier: bundleIdentifier, appName: appName) {
+            self = .email
+        } else if ChatAppIdentifiers.isChat(bundleIdentifier: bundleIdentifier, appName: appName) {
+            self = .chat
+        } else if NotesAppIdentifiers.isNotes(bundleIdentifier: bundleIdentifier, appName: appName) {
+            self = .notes
         } else if IDEAppIdentifiers.isIDE(bundleIdentifier: bundleIdentifier, appName: appName) {
             self = .ide
         } else if BrowserAppIdentifiers.isBrowser(bundleIdentifier: bundleIdentifier, appName: appName) {
@@ -107,11 +124,13 @@ enum SourceAppContext {
 struct ClipboardSnapshot: Sendable {
     let changeCount: Int
     let kind: ClipboardContentKind
+    let representationKind: ClipboardRepresentationKind
     let summary: String
 
     let url: URL?
     let fileURLs: [URL]?
     let plainText: String?
+    let htmlText: String?
     let richTextType: NSPasteboard.PasteboardType?
     let detectedEntities: [DetectedEntityType]
 
@@ -122,20 +141,24 @@ struct ClipboardSnapshot: Sendable {
     init(
         changeCount: Int,
         kind: ClipboardContentKind,
+        representationKind: ClipboardRepresentationKind? = nil,
         summary: String,
         url: URL? = nil,
         fileURLs: [URL]? = nil,
         plainText: String? = nil,
+        htmlText: String? = nil,
         richTextType: NSPasteboard.PasteboardType? = nil,
         detectedEntity: DetectedEntityType = .none,
         detectedEntities: [DetectedEntityType]? = nil
     ) {
         self.changeCount = changeCount
         self.kind = kind
+        self.representationKind = representationKind ?? Self.defaultRepresentationKind(for: kind)
         self.summary = summary
         self.url = url
         self.fileURLs = fileURLs
         self.plainText = plainText
+        self.htmlText = htmlText
         self.richTextType = richTextType
 
         let initialEntities = detectedEntities ?? (detectedEntity == .none ? [] : [detectedEntity])
@@ -146,10 +169,12 @@ struct ClipboardSnapshot: Sendable {
         ClipboardSnapshot(
             changeCount: changeCount,
             kind: kind,
+            representationKind: representationKind,
             summary: summary ?? self.summary,
             url: url,
             fileURLs: fileURLs,
             plainText: plainText,
+            htmlText: htmlText,
             richTextType: richTextType,
             detectedEntities: Self.normalizedEntities(detectedEntities + additionalEntities)
         )
@@ -168,7 +193,22 @@ struct ClipboardSnapshot: Sendable {
         return result
     }
 
+    private static func defaultRepresentationKind(for kind: ClipboardContentKind) -> ClipboardRepresentationKind {
+        switch kind {
+        case .plainText:
+            return .plainText
+        case .richText:
+            return .richText
+        case .url, .fileURLs, .image, .unknown:
+            return .nonText
+        }
+    }
+
     var typeDescription: String {
+        primaryContentLabel
+    }
+
+    var primaryContentLabel: String {
         switch kind {
         case .url:
             return "URL"
@@ -180,35 +220,26 @@ struct ClipboardSnapshot: Sendable {
         case .richText:
             return richTextTypeDescription
         case .plainText:
-            return plainTextTypeDescription
+            if let richTextLabel = richTextRepresentationLabel {
+                return "Plain Text + \(richTextLabel)"
+            }
+            return "Plain Text"
         case .unknown:
             return "Unknown"
         }
     }
 
-    private var plainTextTypeDescription: String {
-        let preferred: [DetectedEntityType: String] = [
-            .html: "HTML Text",
-            .markdown: "Markdown Text",
-            .codeSnippet: "Code",
-            .sql: "SQL",
-            .shellCommand: "Shell Command",
-            .logOutput: "Log Output",
-            .json: "JSON",
-            .base64: "Base64 Text",
-            .urlEncoded: "URL-Encoded Text",
-            .emailDraft: "Email Draft",
-            .slackDraft: "Slack Draft",
-            .foreignLanguage: "Foreign-Language Text",
-        ]
-
-        for entity in detectedEntities {
-            if let label = preferred[entity] {
-                return label
-            }
+    private var richTextRepresentationLabel: String? {
+        switch richTextType?.rawValue {
+        case NSPasteboard.PasteboardType.html.rawValue:
+            return "HTML"
+        case NSPasteboard.PasteboardType.rtf.rawValue:
+            return "RTF"
+        case NSPasteboard.PasteboardType.rtfd.rawValue:
+            return "RTFD"
+        default:
+            return nil
         }
-
-        return "Plain Text"
     }
 
     private var richTextTypeDescription: String {
