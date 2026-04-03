@@ -69,18 +69,20 @@ final class LLMService {
         _ text: String,
         onToken: (@Sendable (String) -> Void)? = nil
     ) async throws -> String {
-        let useLocal = UserDefaults.standard.bool(forKey: "useLocalLLM")
-        if useLocal {
-            if !LocalLLMService.shared.isReady && LocalLLMService.shared.isLoading {
-                await LocalLLMService.shared.waitUntilReady()
-            }
-            if !LocalLLMService.shared.isReady && !LocalLLMService.shared.isLoading {
-                await LocalLLMService.shared.loadModel()
-            }
-            guard LocalLLMService.shared.isReady else {
-                throw LLMError.modelNotAvailable
-            }
+        if !LocalLLMService.shared.isReady && LocalLLMService.shared.isLoading {
+            await LocalLLMService.shared.waitUntilReady()
+        }
+        if !LocalLLMService.shared.isReady && !LocalLLMService.shared.isLoading {
+            await LocalLLMService.shared.loadModel()
+        }
+        if LocalLLMService.shared.isReady {
             return try await LocalLLMService.shared.summarize(text, onToken: onToken)
+        }
+
+        // Fallback to remote API if local model unavailable
+        let useLocal = UserDefaults.standard.object(forKey: "useLocalLLM") as? Bool ?? true
+        if useLocal {
+            throw LLMError.modelNotAvailable
         }
         
         // Get API key from settings
