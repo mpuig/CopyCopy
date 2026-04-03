@@ -392,7 +392,7 @@ actor LlamaContext {
         let tokens = UnsafeMutablePointer<llama_token>.allocate(capacity: nTokens)
         defer { tokens.deallocate() }
 
-        let count = llama_tokenize(vocab, text, Int32(utf8Count), tokens, Int32(nTokens), addBos, false)
+        let count = llama_tokenize(vocab, text, Int32(utf8Count), tokens, Int32(nTokens), addBos, true)
         return (0..<Int(count)).map { tokens[$0] }
     }
 
