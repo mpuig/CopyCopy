@@ -48,7 +48,7 @@ final class LLMService {
     static let shared = LLMService()
     
     private let baseURL = "https://router.huggingface.co/v1/chat/completions"
-    private let defaultModel = "LiquidAI/LFM2.5-350M"
+    private let defaultModel = "LiquidAI/LFM2.5-1.2B-Instruct"
     
     private init() {}
     

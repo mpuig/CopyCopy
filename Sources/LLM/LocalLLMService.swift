@@ -16,7 +16,7 @@ final class LocalLLMService: ObservableObject {
     @Published var errorMessage: String?
     
     private var modelContainer: ModelContainer?
-    private let modelId = "mlx-community/LFM2.5-350M-8bit"
+    private let modelId = "LiquidAI/LFM2.5-1.2B-Instruct-MLX-8bit"
     
     private var modelConfiguration: ModelConfiguration {
         ModelConfiguration(id: modelId)
