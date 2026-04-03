@@ -15,7 +15,7 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
 
     var localPath: URL {
         let cacheDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".cache/copycopy/models")
+            .appendingPathComponent(".copycopy/models")
         return cacheDir.appendingPathComponent(filename)
     }
 

@@ -108,7 +108,7 @@ final class LocalLLMService: ObservableObject {
 
     private func downloadGGUF(definition: ModelDefinition) async throws -> URL {
         let cacheDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".cache/copycopy/models")
+            .appendingPathComponent(".copycopy/models")
         try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
         let localPath = cacheDir.appendingPathComponent(definition.filename)

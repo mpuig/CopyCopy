@@ -17,7 +17,7 @@ final class UsageHistory {
 
     private init() {
         let cacheDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".cache/copycopy")
+            .appendingPathComponent(".copycopy")
         filePath = cacheDir.appendingPathComponent("usage-history.json")
         load()
     }
