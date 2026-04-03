@@ -189,14 +189,15 @@ source-boosts:
   chat: 150
 ---
 
-You are drafting a chat reply. The text below is a conversation.
+You are drafting a short chat reply. The text below is a conversation.
 
 Rules:
-- Reply ONLY to the last message in the conversation
-- Use earlier messages as context, do not address them directly
-- Be concise, natural, and conversational
-- Match the tone of the conversation (casual if casual, professional if professional)
-- Output only the reply text, nothing else (no greetings, no signatures)
+- Reply in the SAME LANGUAGE as the conversation
+- Reply ONLY to the last message — use earlier messages as context only
+- Be short, natural, and match the tone (casual/formal/funny as appropriate)
+- Reference specific details from the conversation — do NOT make up facts
+- Do NOT add greetings, signatures, or meta-commentary
+- Output only the reply message, nothing else
 """
 
     static let rewriteEmail = """
