@@ -1,23 +1,19 @@
 import Foundation
-import Hub
-import MLX
-import MLXLLM
-import MLXLMCommon
+import llama
 import SwiftUI
 
 @MainActor
 final class LocalLLMService: ObservableObject {
     static let shared = LocalLLMService()
 
-    static let defaultModelId = "LiquidAI/LFM2.5-1.2B-Instruct-MLX-8bit"
-
     @Published var isLoading = false
     @Published var isReady = false
     @Published var loadingProgress: String = ""
     @Published var downloadProgress: Double = 0
     @Published var errorMessage: String?
+    @Published var downloadingModels: [String: Double] = [:]
 
-    private var modelContainer: ModelContainer?
+    private var llamaContext: LlamaContext?
     private(set) var loadedModelId: String?
 
     private init() {}
@@ -29,58 +25,118 @@ final class LocalLLMService: ObservableObject {
     }
 
     var currentModelId: String {
-        UserDefaults.standard.string(forKey: "llmModel") ?? Self.defaultModelId
+        UserDefaults.standard.string(forKey: "llmModel") ?? ModelDefinition.defaultId
+    }
+
+    var currentModelDefinition: ModelDefinition? {
+        ModelDefinition.find(currentModelId)
     }
 
     func loadModel() async {
-        let modelId = currentModelId
+        guard let definition = currentModelDefinition else {
+            errorMessage = "Unknown model: \(currentModelId)"
+            return
+        }
 
-        // If already loaded with the same model, skip
-        if isReady, loadedModelId == modelId { return }
+        if isReady, loadedModelId == definition.id { return }
         guard !isLoading else { return }
 
-        // Unload previous model if switching
-        if loadedModelId != nil, loadedModelId != modelId {
-            modelContainer = nil
+        if loadedModelId != nil, loadedModelId != definition.id {
+            llamaContext = nil
             loadedModelId = nil
             isReady = false
         }
 
         isLoading = true
-        loadingProgress = "Loading model..."
+        loadingProgress = "Preparing model..."
         errorMessage = nil
         downloadProgress = 0
 
         do {
-            let configuration = ModelConfiguration(id: modelId)
+            let localPath = try await ensureModelDownloaded(definition)
+            loadingProgress = "Loading model..."
 
-            let container = try await LLMModelFactory.shared.loadContainer(
-                hub: HubApi(),
-                configuration: configuration
-            ) { [weak self] progress in
-                Task { @MainActor in
-                    self?.downloadProgress = progress.fractionCompleted
-                    let percent = Int(progress.fractionCompleted * 100)
-                    if progress.fractionCompleted < 1.0 {
-                        self?.loadingProgress = "Downloading: \(percent)%"
-                    } else {
-                        self?.loadingProgress = "Loading model..."
-                    }
-                }
-            }
+            let context = try await Task.detached(priority: .userInitiated) {
+                try LlamaContext.create(path: localPath.path, template: definition.chatTemplate)
+            }.value
 
-            modelContainer = container
-            loadedModelId = modelId
+            llamaContext = context
+            loadedModelId = definition.id
             isReady = true
             loadingProgress = "Model ready"
-            Logger.info("Local LLM model loaded: \(modelId)", category: .general)
+            Logger.info("Loaded model: \(definition.name)", category: .general)
         } catch {
             isReady = false
             errorMessage = "Failed to load model: \(error.localizedDescription)"
-            Logger.error("Failed to load local LLM: \(error)", category: .general)
+            Logger.error("Failed to load model: \(error)", category: .general)
         }
 
         isLoading = false
+    }
+
+    /// Download a model without loading it. Can be called for multiple models concurrently.
+    func downloadModel(_ definition: ModelDefinition) async {
+        guard !definition.isDownloaded else { return }
+        guard downloadingModels[definition.id] == nil else { return }
+
+        downloadingModels[definition.id] = 0
+
+        do {
+            let cacheDir = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".cache/copycopy/models")
+            try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+
+            let localPath = cacheDir.appendingPathComponent(definition.filename)
+            let modelId = definition.id
+
+            let delegate = DownloadDelegate { [weak self] progress in
+                Task { @MainActor in
+                    self?.downloadingModels[modelId] = progress
+                }
+            }
+            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+
+            let (tempURL, _) = try await session.download(from: definition.downloadURL)
+            session.finishTasksAndInvalidate()
+
+            try FileManager.default.moveItem(at: tempURL, to: localPath)
+            Logger.info("Downloaded model: \(definition.name)", category: .general)
+        } catch {
+            Logger.error("Failed to download \(definition.name): \(error)", category: .general)
+        }
+
+        downloadingModels.removeValue(forKey: definition.id)
+    }
+
+    private func ensureModelDownloaded(_ definition: ModelDefinition) async throws -> URL {
+        if definition.isDownloaded {
+            return definition.localPath
+        }
+
+        let cacheDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".cache/copycopy/models")
+        try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+
+        loadingProgress = "Downloading \(definition.name)..."
+        let modelId = definition.id
+
+        let delegate = DownloadDelegate { [weak self] progress in
+            Task { @MainActor in
+                self?.downloadProgress = progress
+                self?.downloadingModels[modelId] = progress
+                let percent = Int(progress * 100)
+                self?.loadingProgress = "Downloading: \(percent)%"
+            }
+        }
+        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+
+        let (tempURL, _) = try await session.download(from: definition.downloadURL)
+        session.finishTasksAndInvalidate()
+
+        let localPath = definition.localPath
+        try FileManager.default.moveItem(at: tempURL, to: localPath)
+        downloadingModels.removeValue(forKey: modelId)
+        return localPath
     }
 
     func generate(
@@ -90,27 +146,16 @@ final class LocalLLMService: ObservableObject {
         maxTokens: Int = 500,
         onToken: (@Sendable (String) -> Void)? = nil
     ) async throws -> String {
-        guard let container = modelContainer else {
+        guard let context = llamaContext else {
             throw LocalLLMError.modelNotLoaded
         }
 
-        let messages: [Chat.Message] = [
-            .system(systemPrompt),
-            .user(prompt)
-        ]
-
-        let userInput = UserInput(prompt: .chat(messages))
-
-        let parameters = GenerateParameters(
-            maxTokens: maxTokens,
-            temperature: temperature
-        )
-
         return try await Task.detached(priority: .userInitiated) {
-            try await Self.runGeneration(
-                container: container,
-                userInput: userInput,
-                parameters: parameters,
+            try await context.generate(
+                systemPrompt: systemPrompt,
+                userPrompt: prompt,
+                temperature: temperature,
+                maxTokens: Int32(maxTokens),
                 onToken: onToken
             )
         }.value
@@ -140,29 +185,7 @@ final class LocalLLMService: ObservableObject {
 
         return try await generate(
             prompt: truncatedText,
-            systemPrompt: """
-            Clean up the copied chat transcript.
-
-            Keep:
-            - all authors
-            - all timestamps
-            - all real message content
-
-            Remove:
-            - navigation UI
-            - search bars
-            - counts and badges
-            - composer and footer text
-            - buttons, labels, and app chrome
-            - decorative standalone tokens that are not part of a real message
-
-            Rules:
-            - Do not summarize.
-            - Do not rewrite.
-            - Do not omit any real message content.
-            - Preserve the original language.
-            - Return only the cleaned chat transcript as plain text.
-            """,
+            systemPrompt: "Clean up the chat transcript. Keep all authors, timestamps, and message content. Remove navigation UI, search bars, badges, composer text, buttons, and app chrome. Do not summarize or rewrite. Return only the cleaned transcript.",
             temperature: 0.0,
             maxTokens: 1200
         )
@@ -176,22 +199,8 @@ final class LocalLLMService: ObservableObject {
         let response = try await generate(
             prompt: truncatedText,
             systemPrompt: """
-            Classify the clipboard text using only these labels when they apply:
-            ["codeSnippet","markdown","emailDraft","slackDraft","shellCommand","logOutput","sql","foreignLanguage"].
-
-            Rules:
-            - Return a JSON array of zero or more labels from that exact list.
-            - Do not invent labels.
-            - Prefer [] when unsure.
-            - "emailDraft" means the text reads like an email body or reply draft.
-            - "slackDraft" means the text reads like a Slack or chat message draft.
-            - "shellCommand" means the text is primarily a shell command or short shell script.
-            - "logOutput" means the text is primarily logs, stack traces, or command output.
-            - "sql" means the text is primarily SQL code or queries.
-            - "codeSnippet" means the text is primarily source code.
-            - "markdown" means the text is primarily Markdown content.
-            - "foreignLanguage" means the dominant language is not English.
-            Return JSON only.
+            Classify using only these labels: ["codeSnippet","markdown","emailDraft","slackDraft","shellCommand","logOutput","sql","foreignLanguage"].
+            Return a JSON array. Prefer [] when unsure. JSON only.
             """,
             temperature: 0.0,
             maxTokens: 80
@@ -225,39 +234,185 @@ final class LocalLLMService: ObservableObject {
               let end = text[start...].lastIndex(of: "]") else {
             return nil
         }
-
         return String(text[start...end])
     }
+}
 
-    private nonisolated static func runGeneration(
-        container: ModelContainer,
-        userInput: UserInput,
-        parameters: GenerateParameters,
-        onToken: (@Sendable (String) -> Void)? = nil
-    ) async throws -> String {
-        try await container.perform { (context: ModelContext) async throws -> String in
-            let lmInput = try await context.processor.prepare(input: userInput)
+// MARK: - LlamaContext (Swift actor wrapping llama.cpp C API)
 
-            let stream = try MLXLMCommon.generate(
-                input: lmInput,
-                parameters: parameters,
-                context: context
-            )
+actor LlamaContext {
+    private let model: OpaquePointer
+    private let context: OpaquePointer
+    private let vocab: OpaquePointer
+    private let chatTemplate: ChatTemplate
 
-            var output = ""
-            for await generation in stream {
-                if Task.isCancelled { break }
-                if let text = generation.chunk {
-                    output += text
-                    onToken?(text)
-                }
-            }
-
-            return output.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+    init(model: OpaquePointer, context: OpaquePointer, template: ChatTemplate) {
+        self.model = model
+        self.context = context
+        self.vocab = llama_model_get_vocab(model)
+        self.chatTemplate = template
     }
 
+    deinit {
+        llama_model_free(model)
+        llama_free(context)
+    }
+
+    static func create(path: String, template: ChatTemplate) throws -> LlamaContext {
+        llama_backend_init()
+
+        var modelParams = llama_model_default_params()
+        #if targetEnvironment(simulator)
+        modelParams.n_gpu_layers = 0
+        #endif
+
+        guard let model = llama_model_load_from_file(path, modelParams) else {
+            throw LocalLLMError.modelNotLoaded
+        }
+
+        var ctxParams = llama_context_default_params()
+        ctxParams.n_ctx = 2048
+        let nThreads = Int32(max(1, min(8, ProcessInfo.processInfo.processorCount - 2)))
+        ctxParams.n_threads = nThreads
+        ctxParams.n_threads_batch = nThreads
+
+        guard let context = llama_init_from_model(model, ctxParams) else {
+            llama_model_free(model)
+            throw LocalLLMError.modelNotLoaded
+        }
+
+        return LlamaContext(model: model, context: context, template: template)
+    }
+
+    func generate(
+        systemPrompt: String,
+        userPrompt: String,
+        temperature: Float,
+        maxTokens: Int32,
+        onToken: (@Sendable (String) -> Void)?
+    ) async throws -> String {
+        let formatted = chatTemplate.format(systemPrompt: systemPrompt, userPrompt: userPrompt)
+        let tokens = tokenize(text: formatted, addBos: true)
+
+        // Clear KV cache
+        llama_memory_clear(llama_get_memory(context), true)
+
+        // Build sampler chain
+        let sparams = llama_sampler_chain_default_params()
+        let sampler = llama_sampler_chain_init(sparams)!
+        llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature))
+        llama_sampler_chain_add(sampler, llama_sampler_init_dist(UInt32.random(in: 0...UInt32.max)))
+        defer { llama_sampler_free(sampler) }
+
+        // Initial prompt processing
+        var batch = llama_batch_init(Int32(tokens.count), 0, 1)
+        defer { llama_batch_free(batch) }
+
+        for (i, token) in tokens.enumerated() {
+            batch.token[i] = token
+            batch.pos[i] = Int32(i)
+            batch.n_seq_id[i] = 1
+            batch.seq_id[i]![0] = 0
+            batch.logits[i] = 0
+        }
+        batch.n_tokens = Int32(tokens.count)
+        batch.logits[Int(batch.n_tokens) - 1] = 1
+
+        guard llama_decode(context, batch) == 0 else {
+            throw LocalLLMError.generationFailed(NSError(domain: "llama", code: -1, userInfo: [NSLocalizedDescriptionKey: "Initial decode failed"]))
+        }
+
+        // Token generation loop
+        var output = ""
+        var nCur = batch.n_tokens
+        var invalidCChars: [CChar] = []
+
+        for _ in 0..<maxTokens {
+            if Task.isCancelled { break }
+
+            let newTokenId = llama_sampler_sample(sampler, context, batch.n_tokens - 1)
+
+            if llama_vocab_is_eog(vocab, newTokenId) { break }
+
+            let piece = tokenToPiece(token: newTokenId)
+            invalidCChars.append(contentsOf: piece)
+
+            if let str = String(validatingUTF8: invalidCChars + [0]) {
+                invalidCChars.removeAll()
+                output += str
+                onToken?(str)
+            }
+
+            // Prepare next batch
+            batch.n_tokens = 0
+            batch.token[0] = newTokenId
+            batch.pos[0] = nCur
+            batch.n_seq_id[0] = 1
+            batch.seq_id[0]![0] = 0
+            batch.logits[0] = 1
+            batch.n_tokens = 1
+
+            nCur += 1
+
+            guard llama_decode(context, batch) == 0 else { break }
+        }
+
+        // Flush remaining bytes
+        if !invalidCChars.isEmpty {
+            let remaining = String(cString: invalidCChars + [0])
+            output += remaining
+            onToken?(remaining)
+        }
+
+        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func tokenize(text: String, addBos: Bool) -> [llama_token] {
+        let utf8Count = text.utf8.count
+        let nTokens = utf8Count + (addBos ? 1 : 0) + 1
+        let tokens = UnsafeMutablePointer<llama_token>.allocate(capacity: nTokens)
+        defer { tokens.deallocate() }
+
+        let count = llama_tokenize(vocab, text, Int32(utf8Count), tokens, Int32(nTokens), addBos, false)
+        return (0..<Int(count)).map { tokens[$0] }
+    }
+
+    private func tokenToPiece(token: llama_token) -> [CChar] {
+        let bufSize = 8
+        let buf = UnsafeMutablePointer<CChar>.allocate(capacity: bufSize)
+        buf.initialize(repeating: 0, count: bufSize)
+        defer { buf.deallocate() }
+
+        let n = llama_token_to_piece(vocab, token, buf, Int32(bufSize), 0, false)
+        if n < 0 {
+            let newBuf = UnsafeMutablePointer<CChar>.allocate(capacity: Int(-n))
+            newBuf.initialize(repeating: 0, count: Int(-n))
+            defer { newBuf.deallocate() }
+            let n2 = llama_token_to_piece(vocab, token, newBuf, -n, 0, false)
+            return Array(UnsafeBufferPointer(start: newBuf, count: Int(n2)))
+        }
+        return Array(UnsafeBufferPointer(start: buf, count: Int(n)))
+    }
 }
+
+// MARK: - Download Delegate
+
+private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    let onProgress: (Double) -> Void
+
+    init(onProgress: @escaping (Double) -> Void) {
+        self.onProgress = onProgress
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        guard totalBytesExpectedToWrite > 0 else { return }
+        onProgress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
+    }
+}
+
+// MARK: - Errors
 
 enum LocalLLMError: Error, LocalizedError {
     case modelNotLoaded

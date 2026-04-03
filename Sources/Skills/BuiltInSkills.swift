@@ -2,31 +2,20 @@ import Foundation
 
 enum BuiltInSkills {
     static let all: [(id: String, content: String)] = [
-        // Essential
         ("open-url", openURL),
         ("search-web", searchWeb),
-
-        // Text cleanup
         ("clean-text", cleanText),
         ("html-to-markdown", htmlToMarkdown),
-
-        // AI writing
         ("fix-grammar", fixGrammar),
         ("make-concise", makeConcise),
         ("summarize", summarize),
         ("translate", translate),
-
-        // AI contextual
         ("draft-chat-reply", draftChatReply),
         ("rewrite-email", rewriteEmail),
         ("extract-action-items", extractActionItems),
         ("explain-code", explainCode),
         ("extract-data", extractData),
-
-        // Places
         ("open-in-maps", openInMaps),
-
-        // Filesystem
         ("reveal-path", revealPath),
         ("open-terminal", openTerminal),
     ]
@@ -36,6 +25,7 @@ enum BuiltInSkills {
     static let openURL = """
 ---
 name: Open URL
+description: Open in default browser
 icon: link
 content-types: url
 ---
@@ -46,6 +36,7 @@ openURL({clipboardURL})
     static let searchWeb = """
 ---
 name: Search the Web
+description: Search DuckDuckGo
 icon: magnifyingglass
 content-types: text
 source-boosts:
@@ -62,6 +53,7 @@ openURL(https://duckduckgo.com/?q={clipboard})
     static let cleanText = """
 ---
 name: Clean Text
+description: Strip formatting artifacts and normalize whitespace
 icon: sparkles
 content-types: text
 source-boosts:
@@ -76,6 +68,7 @@ copyToClipboard({clipboardClean})
     static let htmlToMarkdown = """
 ---
 name: HTML to Markdown
+description: Convert rich HTML to clean Markdown
 icon: arrow.down.doc.text
 content-types: text
 entity-types: html
@@ -93,6 +86,7 @@ htmlToMarkdown({clipboardHTML})
     static let fixGrammar = """
 ---
 name: Fix Grammar
+description: Fix grammar, spelling, and punctuation
 icon: checkmark.bubble
 content-types: text
 text-source: clipboardChatCleaned
@@ -109,6 +103,7 @@ Fix grammar, spelling, and punctuation. Preserve meaning and tone. Return only t
     static let makeConcise = """
 ---
 name: Make Concise
+description: Rewrite shorter and clearer
 icon: scissors
 content-types: text
 text-source: clipboardChatCleaned
@@ -125,7 +120,7 @@ Rewrite shorter and clearer. Cut filler and repetition. Keep all key facts. Retu
     static let summarize = """
 ---
 name: Summarize
-icon: text.redaction
+description: Summarize into key points
 execute: summarize
 content-types: text
 text-source: clipboardChatCleaned
@@ -144,6 +139,7 @@ Summarize into key points
     static let translate = """
 ---
 name: Translate to English
+description: Translate foreign text to English
 icon: globe
 content-types: text
 entity-types: foreignLanguage
@@ -161,6 +157,7 @@ Translate to English. Return only the translation.
     static let draftChatReply = """
 ---
 name: Draft Reply
+description: Draft a reply to the last message
 icon: arrowshape.turn.up.left
 content-types: text
 source-contexts: chat
@@ -176,6 +173,7 @@ Reply to the last message. Use earlier messages as context only. Be concise and 
     static let rewriteEmail = """
 ---
 name: Rewrite Email
+description: Polish and rewrite email draft
 icon: envelope.badge
 content-types: text
 entity-types: emailDraft
@@ -190,6 +188,7 @@ Rewrite as a polished email. Keep intent, facts, and commitments. Fix clarity, g
     static let extractActionItems = """
 ---
 name: Extract Action Items
+description: Extract action items and next steps
 icon: checklist
 content-types: text
 text-source: clipboardChatCleaned
@@ -206,6 +205,7 @@ List action items as bullets. Include owners and deadlines if mentioned. Only in
     static let explainCode = """
 ---
 name: Explain Code
+description: Explain what this code does
 icon: text.bubble
 content-types: text
 entity-types: codeSnippet, shellCommand, sql, logOutput
@@ -221,6 +221,7 @@ Explain this code. Key logic, inputs/outputs, risks. Bullet points.
     static let extractData = """
 ---
 name: Extract Data
+description: Extract emails, URLs, phones, dates from text
 icon: tablecells
 content-types: text
 text-source: clipboardLLM
@@ -242,6 +243,7 @@ If you find data, use copyToClipboard to copy the extracted list.
     static let openInMaps = """
 ---
 name: Open in Maps
+description: Open place or address in Apple Maps
 icon: map
 content-types: text
 entity-types: placeName, address, coordinates
@@ -255,6 +257,7 @@ openURL(maps://?q={clipboard})
     static let revealPath = """
 ---
 name: Reveal in Finder
+description: Show file path in Finder
 icon: folder
 content-types: text
 entity-types: filePath
@@ -266,6 +269,7 @@ revealPath({clipboardTrimmed})
     static let openTerminal = """
 ---
 name: Open in Terminal
+description: Open directory in Terminal
 icon: terminal
 content-types: text
 entity-types: filePath

@@ -1,6 +1,6 @@
 import Foundation
 
-enum LLMError: Error {
+enum LLMError: Error, LocalizedError {
     case invalidURL
     case noAPIKey
     case networkError(Error)
@@ -9,6 +9,19 @@ enum LLMError: Error {
     case encodingError(Error)
     case rateLimited
     case modelNotAvailable
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL: return "Invalid API URL"
+        case .noAPIKey: return "No API key configured"
+        case .networkError(let e): return "Network error: \(e.localizedDescription)"
+        case .invalidResponse: return "Invalid response from server"
+        case .decodingError: return "Could not parse server response"
+        case .encodingError: return "Could not encode request"
+        case .rateLimited: return "Rate limited — try again later"
+        case .modelNotAvailable: return "AI model not loaded. Download and load a model in Settings."
+        }
+    }
 }
 
 struct LLMMessage: Codable {

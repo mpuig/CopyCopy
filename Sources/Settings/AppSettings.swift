@@ -57,7 +57,7 @@ final class AppSettings: ObservableObject {
         self.llmEnabled = UserDefaults.standard.object(forKey: "llmEnabled") as? Bool ?? true
         self.useLocalLLM = UserDefaults.standard.object(forKey: "useLocalLLM") as? Bool ?? true
         self.llmApiKey = UserDefaults.standard.string(forKey: "llmApiKey") ?? ""
-        self.llmModel = UserDefaults.standard.string(forKey: "llmModel") ?? "LiquidAI/LFM2.5-1.2B-Instruct-MLX-8bit"
+        self.llmModel = UserDefaults.standard.string(forKey: "llmModel") ?? ModelDefinition.defaultId
 
         syncLaunchAtLoginState()
     }

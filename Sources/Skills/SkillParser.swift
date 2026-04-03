@@ -74,8 +74,10 @@ enum SkillParser {
         _ = try ToolValidator.validateExecuteFunction(execute)
 
         let icon = frontmatter["icon"] ?? "star"
-        let description = body.trimmingCharacters(in: .whitespacesAndNewlines)
-            .components(separatedBy: "\n").first(where: { !$0.isEmpty }) ?? name
+        let description = frontmatter["description"]
+            ?? body.trimmingCharacters(in: .whitespacesAndNewlines)
+                .components(separatedBy: "\n").first(where: { !$0.isEmpty })
+            ?? name
 
         let contentTypes = parseFilterArray(
             frontmatter["content-types"]
@@ -153,6 +155,9 @@ enum SkillParser {
         guard let name = frontmatter["name"] else {
             throw ParseError(message: "Skill '\(id)' missing required 'name' field")
         }
+        guard let description = frontmatter["description"] else {
+            throw ParseError(message: "Skill '\(id)' missing required 'description' field")
+        }
 
         let icon = frontmatter["icon"] ?? "star"
         let filters = parseCommonFilters(frontmatter)
@@ -162,7 +167,7 @@ enum SkillParser {
         if let toolCall = parseToolCall(body) {
             let (execute, parameters) = try buildToolCallParameters(toolCall)
             return Skill(
-                id: id, name: name, description: name,
+                id: id, name: name, description: description,
                 icon: icon, execute: execute, parameters: parameters,
                 contentTypes: filters.contentTypes,
                 entityTypes: filters.entityTypes,
@@ -191,7 +196,7 @@ enum SkillParser {
         )
 
         return Skill(
-            id: id, name: name, description: body.components(separatedBy: "\n").first(where: { !$0.isEmpty }) ?? name,
+            id: id, name: name, description: description,
             icon: icon, execute: execute, parameters: parameters,
             contentTypes: filters.contentTypes,
             entityTypes: filters.entityTypes,

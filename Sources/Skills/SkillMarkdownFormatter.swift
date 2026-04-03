@@ -4,6 +4,7 @@ enum SkillMarkdownFormatter {
     static func formatFlat(skill: Skill) -> String {
         var lines: [String] = ["---"]
         lines.append("name: \(skill.name)")
+        lines.append("description: \(skill.description)")
         lines.append("icon: \(skill.icon)")
 
         // Only emit execute: for the special summarize path
