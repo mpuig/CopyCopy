@@ -2,11 +2,15 @@ import Foundation
 
 struct SuggestedAction: Identifiable {
     typealias ResultCallback = (_ text: String, _ isInClipboard: Bool) -> Void
+    typealias StreamCallback = (_ token: String) -> Void
 
     let id = UUID()
     let title: String
     let subtitle: String?
     let systemImage: String
-    let perform: (@escaping ResultCallback) -> Void
+    /// Returns an optional cancel closure. Non-LLM actions return nil.
+    let perform: (
+        _ completion: @escaping ResultCallback,
+        _ onToken: @escaping StreamCallback
+    ) -> (() -> Void)?
 }
-

@@ -6,89 +6,196 @@ enum SkillParser {
         var description: String { message }
     }
 
-    static func parse(id: String, content: String, isBuiltIn: Bool) throws -> Skill {
+    // MARK: - Public API
+
+    static func parseAll(id: String, content: String, isBuiltIn: Bool) throws -> [Skill] {
         let (frontmatter, body) = try extractFrontmatter(content)
+
+        // New flat format: frontmatter contains "execute" key → single skill
+        if frontmatter["execute"] != nil {
+            let skill = try parseFlatSkill(id: id, frontmatter: frontmatter, body: body, isBuiltIn: isBuiltIn)
+            return [skill]
+        }
+
+        // Old grouped format: JSON tools block or legacy ### sections → one skill per tool
+        let parentFilters = parseParentFilters(frontmatter)
         let tools = try parseTools(id: id, body: body)
 
+        return tools.map { tool in
+            Skill(
+                id: tool.id,
+                name: tool.name,
+                description: tool.description,
+                icon: tool.icon,
+                execute: tool.execute,
+                parameters: tool.parameters,
+                contentTypes: parentFilters.contentTypes,
+                entityTypes: mergeEntityTypes(parent: parentFilters.entityTypes, tool: tool),
+                sourceContexts: mergeSourceContexts(parent: parentFilters.sourceContexts, tool: tool),
+                sourceBoosts: tool.sourceBoosts,
+                minimumCharacterCount: tool.minimumCharacterCount,
+                maximumCharacterCount: tool.maximumCharacterCount,
+                isBuiltIn: isBuiltIn
+            )
+        }
+    }
+
+    /// Convenience for callers that expect a single skill (backward compat).
+    static func parse(id: String, content: String, isBuiltIn: Bool) throws -> Skill {
+        let skills = try parseAll(id: id, content: content, isBuiltIn: isBuiltIn)
+        guard let first = skills.first else {
+            throw ParseError(message: "Skill '\(id)' produced no actions")
+        }
+        return first
+    }
+
+    // MARK: - Flat Format
+
+    private static func parseFlatSkill(
+        id: String,
+        frontmatter: [String: String],
+        body: String,
+        isBuiltIn: Bool
+    ) throws -> Skill {
         guard let name = frontmatter["name"] else {
             throw ParseError(message: "Skill '\(id)' missing required 'name' field")
         }
-        guard let description = frontmatter["description"] else {
-            throw ParseError(message: "Skill '\(id)' missing required 'description' field")
+        guard let execute = frontmatter["execute"] else {
+            throw ParseError(message: "Skill '\(id)' missing required 'execute' field")
         }
 
+        _ = try ToolValidator.validateExecuteFunction(execute)
+
+        let icon = frontmatter["icon"] ?? "star"
+        let description = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: "\n").first(where: { !$0.isEmpty }) ?? name
+
         let contentTypes = parseFilterArray(
-            frontmatter["metadata.copycopy-content-types"]
+            frontmatter["content-types"]
+                ?? frontmatter["metadata.copycopy-content-types"]
                 ?? frontmatter["metadata.content_types"]
-                ?? frontmatter["content_types"]
         ) { ContentTypeFilter(rawValue: $0) }
 
         let entityTypes = parseFilterArray(
-            frontmatter["metadata.copycopy-entity-types"]
+            frontmatter["entity-types"]
+                ?? frontmatter["metadata.copycopy-entity-types"]
                 ?? frontmatter["metadata.entity_types"]
-                ?? frontmatter["entity_types"]
         ) { EntityFilter(rawValue: $0) }
 
         let sourceContexts = parseFilterArray(
-            frontmatter["metadata.copycopy-source-contexts"]
+            frontmatter["source-contexts"]
+                ?? frontmatter["metadata.copycopy-source-contexts"]
                 ?? frontmatter["metadata.source_contexts"]
-                ?? frontmatter["source_contexts"]
         ) { SourceContextFilter(rawValue: $0) }
 
-        return Skill(
+        let sourceBoosts = parseNestedSourceBoosts(frontmatter)
+        let parameters = parseNestedParameters(frontmatter)
+
+        let minimumCharacterCount = (frontmatter["minimum-chars"] ?? frontmatter["minimum_characters"]).flatMap(Int.init)
+        let maximumCharacterCount = (frontmatter["maximum-chars"] ?? frontmatter["maximum_characters"]).flatMap(Int.init)
+
+        let skill = Skill(
             id: id,
             name: name,
             description: description,
+            icon: icon,
+            execute: execute,
+            parameters: parameters,
             contentTypes: contentTypes,
             entityTypes: entityTypes,
             sourceContexts: sourceContexts,
-            tools: tools,
+            sourceBoosts: sourceBoosts.isEmpty ? nil : sourceBoosts,
+            minimumCharacterCount: minimumCharacterCount,
+            maximumCharacterCount: maximumCharacterCount,
             isBuiltIn: isBuiltIn
+        )
+
+        try ToolValidator.validateJSONObjectParameters(skill.parameters)
+        return skill
+    }
+
+    private static func parseNestedSourceBoosts(_ frontmatter: [String: String]) -> [String: Int] {
+        var boosts: [String: Int] = [:]
+        let prefix = "source-boosts."
+        for (key, value) in frontmatter where key.hasPrefix(prefix) {
+            let name = String(key.dropFirst(prefix.count))
+            if let intValue = Int(value) {
+                boosts[name] = intValue
+            }
+        }
+        return boosts
+    }
+
+    private static func parseNestedParameters(_ frontmatter: [String: String]) -> ToolParameters {
+        // Collect parameters.{name}.{field} entries
+        let prefix = "parameters."
+        var paramsByName: [String: [String: String]] = [:]
+
+        for (key, value) in frontmatter where key.hasPrefix(prefix) {
+            let rest = String(key.dropFirst(prefix.count))
+            let parts = rest.split(separator: ".", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            let paramName = String(parts[0])
+            let field = String(parts[1])
+            paramsByName[paramName, default: [:]][field] = value
+        }
+
+        guard !paramsByName.isEmpty else { return .empty }
+
+        var properties: [String: ToolProperty] = [:]
+        var required: [String] = []
+
+        for (name, fields) in paramsByName.sorted(by: { $0.key < $1.key }) {
+            properties[name] = ToolProperty(
+                type: "string",
+                description: fields["description"] ?? name,
+                source: fields["source"],
+                value: fields["value"],
+                prefix: fields["prefix"],
+                suffix: fields["suffix"]
+            )
+            required.append(name)
+        }
+
+        return ToolParameters(type: "object", properties: properties, required: required)
+    }
+
+    // MARK: - Grouped Format (backward compat)
+
+    private struct ParentFilters {
+        let contentTypes: [ContentTypeFilter]
+        let entityTypes: [EntityFilter]
+        let sourceContexts: [SourceContextFilter]
+    }
+
+    private static func parseParentFilters(_ frontmatter: [String: String]) -> ParentFilters {
+        ParentFilters(
+            contentTypes: parseFilterArray(
+                frontmatter["metadata.copycopy-content-types"]
+                    ?? frontmatter["metadata.content_types"]
+                    ?? frontmatter["content_types"]
+            ) { ContentTypeFilter(rawValue: $0) },
+            entityTypes: parseFilterArray(
+                frontmatter["metadata.copycopy-entity-types"]
+                    ?? frontmatter["metadata.entity_types"]
+                    ?? frontmatter["entity_types"]
+            ) { EntityFilter(rawValue: $0) },
+            sourceContexts: parseFilterArray(
+                frontmatter["metadata.copycopy-source-contexts"]
+                    ?? frontmatter["metadata.source_contexts"]
+                    ?? frontmatter["source_contexts"]
+            ) { SourceContextFilter(rawValue: $0) }
         )
     }
 
-    private static func extractFrontmatter(_ content: String) throws -> ([String: String], String) {
-        let lines = content.components(separatedBy: "\n")
-        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else {
-            throw ParseError(message: "Missing opening '---' delimiter")
-        }
+    private static func mergeEntityTypes(parent: [EntityFilter], tool: ToolDefinition) -> [EntityFilter] {
+        let toolTypes = tool.parsedEntityTypes
+        return toolTypes.isEmpty ? parent : toolTypes
+    }
 
-        var frontmatter: [String: String] = [:]
-        var endIndex = 0
-        var currentSection: String?
-
-        for index in 1..<lines.count {
-            let line = lines[index]
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-            if trimmed == "---" {
-                endIndex = index
-                break
-            }
-
-            let isIndented = line.hasPrefix("  ") || line.hasPrefix("\t")
-            guard let colonRange = trimmed.range(of: ":") else { continue }
-
-            let key = String(trimmed[..<colonRange.lowerBound]).trimmingCharacters(in: .whitespaces)
-            let value = String(trimmed[colonRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-            guard !key.isEmpty else { continue }
-
-            if isIndented, let currentSection {
-                frontmatter["\(currentSection).\(key)"] = value
-            } else if value.isEmpty {
-                currentSection = key
-            } else {
-                currentSection = nil
-                frontmatter[key] = value
-            }
-        }
-
-        guard endIndex > 0 else {
-            throw ParseError(message: "Missing closing '---' delimiter")
-        }
-
-        let body = lines.dropFirst(endIndex + 1).joined(separator: "\n")
-        return (frontmatter, body)
+    private static func mergeSourceContexts(parent: [SourceContextFilter], tool: ToolDefinition) -> [SourceContextFilter] {
+        let toolContexts = tool.parsedSourceContexts
+        return toolContexts.isEmpty ? parent : toolContexts
     }
 
     private static func parseTools(id: String, body: String) throws -> [ToolDefinition] {
@@ -118,6 +225,77 @@ enum SkillParser {
             }
         }
     }
+
+    // MARK: - Frontmatter Extraction
+
+    private static func extractFrontmatter(_ content: String) throws -> ([String: String], String) {
+        let lines = content.components(separatedBy: "\n")
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else {
+            throw ParseError(message: "Missing opening '---' delimiter")
+        }
+
+        var frontmatter: [String: String] = [:]
+        var endIndex = 0
+        var sectionStack: [String] = []
+
+        for index in 1..<lines.count {
+            let line = lines[index]
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmed == "---" {
+                endIndex = index
+                break
+            }
+
+            let indentLevel = countIndentLevel(line)
+            guard let colonRange = trimmed.range(of: ":") else { continue }
+
+            let key = String(trimmed[..<colonRange.lowerBound]).trimmingCharacters(in: .whitespaces)
+            let value = String(trimmed[colonRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+            guard !key.isEmpty else { continue }
+
+            // Adjust section stack based on indent
+            while sectionStack.count > indentLevel {
+                sectionStack.removeLast()
+            }
+
+            if value.isEmpty {
+                // Section header
+                if indentLevel == 0 {
+                    sectionStack = [key]
+                } else {
+                    sectionStack.append(key)
+                }
+            } else {
+                let cleanedValue = value.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+                if sectionStack.isEmpty {
+                    frontmatter[key] = cleanedValue
+                } else {
+                    let fullKey = (sectionStack + [key]).joined(separator: ".")
+                    frontmatter[fullKey] = cleanedValue
+                }
+            }
+        }
+
+        guard endIndex > 0 else {
+            throw ParseError(message: "Missing closing '---' delimiter")
+        }
+
+        let body = lines.dropFirst(endIndex + 1).joined(separator: "\n")
+        return (frontmatter, body)
+    }
+
+    private static func countIndentLevel(_ line: String) -> Int {
+        var spaces = 0
+        for char in line {
+            if char == " " { spaces += 1 }
+            else if char == "\t" { spaces += 2 }
+            else { break }
+        }
+        return spaces / 2
+    }
+
+    // MARK: - JSON Block Extraction
 
     private static func extractJSONBlock(afterHeading heading: String, in body: String) -> String? {
         let lines = body.components(separatedBy: "\n")
@@ -154,6 +332,8 @@ enum SkillParser {
 
         return nil
     }
+
+    // MARK: - Legacy Format Parsing
 
     private static func parseLegacyActions(_ body: String) -> [LegacySkillAction] {
         let lines = body.components(separatedBy: "\n")
@@ -203,8 +383,12 @@ enum SkillParser {
             function: props["function"].flatMap(ActionType.init(rawValue:)),
             template: props["template"],
             prompt: props["prompt"],
+            textSource: props["text_source"],
             sourceContexts: parseFilterArray(props["source_contexts"]) { SourceContextFilter(rawValue: $0) },
-            entityTypes: parseFilterArray(props["entity_types"]) { EntityFilter(rawValue: $0) }
+            entityTypes: parseFilterArray(props["entity_types"]) { EntityFilter(rawValue: $0) },
+            sourceBoosts: parseSourceBoosts(props["source_boosts"]),
+            minimumCharacterCount: props["minimum_characters"].flatMap(Int.init),
+            maximumCharacterCount: props["maximum_characters"].flatMap(Int.init)
         )
     }
 
@@ -228,12 +412,18 @@ enum SkillParser {
                 parameters: toolParameters(
                     properties: [
                         "systemPrompt": literalProperty(value: prompt, description: "System prompt"),
-                        "prompt": sourcedProperty(source: "clipboard", description: "Clipboard text"),
+                        "prompt": sourcedProperty(
+                            source: action.textSource ?? "clipboardChatCleaned",
+                            description: "Clipboard text"
+                        ),
                     ],
                     required: ["systemPrompt", "prompt"]
                 ),
                 entityTypes: filters.entityTypes,
-                sourceContexts: filters.sourceContexts
+                sourceContexts: filters.sourceContexts,
+                sourceBoosts: action.sourceBoosts,
+                minimumCharacterCount: action.minimumCharacterCount,
+                maximumCharacterCount: action.maximumCharacterCount
             )
 
         case .function:
@@ -276,7 +466,10 @@ enum SkillParser {
                     required: ["appName"]
                 ),
                 entityTypes: filters.entityTypes,
-                sourceContexts: filters.sourceContexts
+                sourceContexts: filters.sourceContexts,
+                sourceBoosts: action.sourceBoosts,
+                minimumCharacterCount: action.minimumCharacterCount,
+                maximumCharacterCount: action.maximumCharacterCount
             )
 
         case .revealInFinder:
@@ -298,7 +491,10 @@ enum SkillParser {
                     required: ["text"]
                 ),
                 entityTypes: filters.entityTypes,
-                sourceContexts: filters.sourceContexts
+                sourceContexts: filters.sourceContexts,
+                sourceBoosts: action.sourceBoosts,
+                minimumCharacterCount: action.minimumCharacterCount,
+                maximumCharacterCount: action.maximumCharacterCount
             )
 
         case .saveImage:
@@ -312,11 +508,14 @@ enum SkillParser {
                 icon: action.icon,
                 execute: ExecuteFunction.saveTempFile.rawValue,
                 parameters: toolParameters(
-                    properties: ["text": sourcedProperty(source: "clipboard", description: "Clipboard text")],
+                    properties: ["text": sourcedProperty(source: "clipboardLLM", description: "Clipboard text")],
                     required: ["text"]
                 ),
                 entityTypes: filters.entityTypes,
-                sourceContexts: filters.sourceContexts
+                sourceContexts: filters.sourceContexts,
+                sourceBoosts: action.sourceBoosts,
+                minimumCharacterCount: action.minimumCharacterCount,
+                maximumCharacterCount: action.maximumCharacterCount
             )
 
         case .stripANSI:
@@ -331,7 +530,10 @@ enum SkillParser {
                     required: ["text"]
                 ),
                 entityTypes: filters.entityTypes,
-                sourceContexts: filters.sourceContexts
+                sourceContexts: filters.sourceContexts,
+                sourceBoosts: action.sourceBoosts,
+                minimumCharacterCount: action.minimumCharacterCount,
+                maximumCharacterCount: action.maximumCharacterCount
             )
 
         case .htmlToMarkdown:
@@ -342,7 +544,7 @@ enum SkillParser {
                 icon: action.icon,
                 execute: ExecuteFunction.htmlToMarkdown.rawValue,
                 parameters: toolParameters(
-                    properties: ["html": sourcedProperty(source: "clipboard", description: "Clipboard HTML")],
+                    properties: ["html": sourcedProperty(source: "clipboardHTML", description: "Clipboard HTML")],
                     required: ["html"]
                 ),
                 entityTypes: filters.entityTypes,
@@ -357,11 +559,19 @@ enum SkillParser {
                 icon: action.icon,
                 execute: ExecuteFunction.summarize.rawValue,
                 parameters: toolParameters(
-                    properties: ["text": sourcedProperty(source: "clipboard", description: "Clipboard text")],
+                    properties: [
+                        "text": sourcedProperty(
+                            source: action.textSource ?? "clipboardChatCleaned",
+                            description: "Clipboard text"
+                        )
+                    ],
                     required: ["text"]
                 ),
                 entityTypes: filters.entityTypes,
-                sourceContexts: filters.sourceContexts
+                sourceContexts: filters.sourceContexts,
+                sourceBoosts: action.sourceBoosts,
+                minimumCharacterCount: action.minimumCharacterCount,
+                maximumCharacterCount: action.maximumCharacterCount
             )
         }
     }
@@ -384,7 +594,10 @@ enum SkillParser {
                     required: ["url"]
                 ),
                 entityTypes: filters.entityTypes,
-                sourceContexts: filters.sourceContexts
+                sourceContexts: filters.sourceContexts,
+                sourceBoosts: action.sourceBoosts,
+                minimumCharacterCount: action.minimumCharacterCount,
+                maximumCharacterCount: action.maximumCharacterCount
             )
         }
 
@@ -400,7 +613,10 @@ enum SkillParser {
                     required: ["url"]
                 ),
                 entityTypes: filters.entityTypes,
-                sourceContexts: filters.sourceContexts
+                sourceContexts: filters.sourceContexts,
+                sourceBoosts: action.sourceBoosts,
+                minimumCharacterCount: action.minimumCharacterCount,
+                maximumCharacterCount: action.maximumCharacterCount
             )
         }
 
@@ -494,7 +710,10 @@ enum SkillParser {
                     required: ["baseURL", "fragment"]
                 ),
                 entityTypes: filters.entityTypes,
-                sourceContexts: filters.sourceContexts
+                sourceContexts: filters.sourceContexts,
+                sourceBoosts: action.sourceBoosts,
+                minimumCharacterCount: action.minimumCharacterCount,
+                maximumCharacterCount: action.maximumCharacterCount
             )
         }
 
@@ -513,7 +732,10 @@ enum SkillParser {
                 required: ["baseURL", "path"]
             ),
             entityTypes: filters.entityTypes,
-            sourceContexts: filters.sourceContexts
+            sourceContexts: filters.sourceContexts,
+            sourceBoosts: action.sourceBoosts,
+            minimumCharacterCount: action.minimumCharacterCount,
+            maximumCharacterCount: action.maximumCharacterCount
         )
     }
 
@@ -570,9 +792,14 @@ enum SkillParser {
             execute: execute.rawValue,
             parameters: toolParameters(properties: properties, required: required),
             entityTypes: filters.entityTypes,
-            sourceContexts: filters.sourceContexts
+            sourceContexts: filters.sourceContexts,
+            sourceBoosts: action.sourceBoosts,
+            minimumCharacterCount: action.minimumCharacterCount,
+            maximumCharacterCount: action.maximumCharacterCount
         )
     }
+
+    // MARK: - Helpers
 
     private static func directTool(
         action: LegacySkillAction,
@@ -587,7 +814,10 @@ enum SkillParser {
             execute: execute.rawValue,
             parameters: .empty,
             entityTypes: filters.entityTypes,
-            sourceContexts: filters.sourceContexts
+            sourceContexts: filters.sourceContexts,
+            sourceBoosts: action.sourceBoosts,
+            minimumCharacterCount: action.minimumCharacterCount,
+            maximumCharacterCount: action.maximumCharacterCount
         )
     }
 
@@ -608,6 +838,11 @@ enum SkillParser {
 
     private static func extractPlaceholder(from template: String) throws -> PlaceholderMatch {
         let placeholders: [(token: String, source: String)] = [
+            ("{text:clean}", "clipboardClean"),
+            ("{text:uppercase}", "clipboardUppercase"),
+            ("{text:lowercase}", "clipboardLowercase"),
+            ("{text:titlecase}", "clipboardTitleCase"),
+            ("{text:sentencecase}", "clipboardSentenceCase"),
             ("{text:trimmed}", "clipboardTrimmed"),
             ("{TEXT:ENCODED}", "clipboard"),
             ("{text:encoded}", "clipboard"),
@@ -666,7 +901,7 @@ enum SkillParser {
         ToolProperty(type: "string", description: description, source: source, value: nil, prefix: prefix, suffix: suffix)
     }
 
-    private static func parseFilterArray<T>(_ value: String?, transform: (String) -> T?) -> [T] {
+    static func parseFilterArray<T>(_ value: String?, transform: (String) -> T?) -> [T] {
         guard let value else { return [] }
         let cleaned = value.trimmingCharacters(in: CharacterSet(charactersIn: "[]\"'"))
         guard !cleaned.isEmpty else { return [] }
@@ -676,6 +911,23 @@ enum SkillParser {
                 let trimmed = item.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"'")))
                 return trimmed.isEmpty ? nil : transform(trimmed)
             }
+    }
+
+    private static func parseSourceBoosts(_ value: String?) -> [String: Int] {
+        guard let value else { return [:] }
+        let cleaned = value.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+        guard !cleaned.isEmpty else { return [:] }
+
+        var boosts: [String: Int] = [:]
+        for item in cleaned.components(separatedBy: ",") {
+            let pair = item.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: true)
+            guard pair.count == 2 else { continue }
+            let key = String(pair[0]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let value = String(pair[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !key.isEmpty, let intValue = Int(value) else { continue }
+            boosts[key] = intValue
+        }
+        return boosts
     }
 }
 
@@ -687,8 +939,12 @@ private struct LegacySkillAction {
     let function: ActionType?
     let template: String?
     let prompt: String?
+    let textSource: String?
     let sourceContexts: [SourceContextFilter]
     let entityTypes: [EntityFilter]
+    let sourceBoosts: [String: Int]
+    let minimumCharacterCount: Int?
+    let maximumCharacterCount: Int?
 }
 
 private enum LegacySkillActionType: String {

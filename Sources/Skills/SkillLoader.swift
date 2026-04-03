@@ -2,6 +2,11 @@ import Foundation
 
 @MainActor
 final class SkillLoader {
+    private static let orphanedGroupIDs: Set<String> = [
+        "urls", "files", "images", "text", "places", "code", "transform", "filesystem",
+        "contacts", "social", "tracking", "finance", "datetime", "identity"
+    ]
+
     private var skills: [Skill] = []
 
     init() {
@@ -14,8 +19,8 @@ final class SkillLoader {
 
         for (id, content) in BuiltInSkills.all {
             do {
-                let skill = try SkillParser.parse(id: id, content: content, isBuiltIn: true)
-                loaded.append(skill)
+                let parsed = try SkillParser.parseAll(id: id, content: content, isBuiltIn: true)
+                loaded.append(contentsOf: parsed)
             } catch {
                 Logger.error("Failed to parse built-in skill '\(id)': \(error)", category: .general)
             }
@@ -32,13 +37,15 @@ final class SkillLoader {
         let skillsDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".copycopy/skills")
 
-        for (id, content) in BuiltInSkills.all {
-            let dir = skillsDir.appendingPathComponent(id)
-            let file = dir.appendingPathComponent("SKILL.md")
+        removeOrphanedGroupDirectories(in: skillsDir)
 
+        for (id, content) in BuiltInSkills.all {
             do {
                 let builtInSkill = try SkillParser.parse(id: id, content: content, isBuiltIn: true)
-                let exportedContent = try SkillMarkdownFormatter.formatForExport(skill: builtInSkill, source: content)
+                let exportedContent = SkillMarkdownFormatter.formatFlat(skill: builtInSkill)
+                let dir = skillsDir.appendingPathComponent(id)
+                let file = dir.appendingPathComponent("SKILL.md")
+
                 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
                 if FileManager.default.fileExists(atPath: file.path) {
@@ -55,6 +62,22 @@ final class SkillLoader {
                 Logger.info("Exported built-in skill '\(id)' to \(file.path)", category: .general)
             } catch {
                 Logger.error("Failed to export skill '\(id)': \(error)", category: .general)
+            }
+        }
+    }
+
+    private func removeOrphanedGroupDirectories(in skillsDir: URL) {
+        for groupID in Self.orphanedGroupIDs {
+            let dir = skillsDir.appendingPathComponent(groupID)
+            guard FileManager.default.fileExists(atPath: dir.path) else { continue }
+
+            let file = dir.appendingPathComponent("SKILL.md")
+            guard let content = try? String(contentsOf: file, encoding: .utf8) else { continue }
+
+            // Only remove if it's an old grouped format (contains ## Tools or ## Actions)
+            if content.contains("## Tools") || content.contains("## Actions") {
+                try? FileManager.default.removeItem(at: dir)
+                Logger.info("Removed orphaned group directory '\(groupID)'", category: .general)
             }
         }
     }
@@ -92,10 +115,12 @@ final class SkillLoader {
         lhs.id == rhs.id &&
         lhs.name == rhs.name &&
         lhs.description == rhs.description &&
+        lhs.icon == rhs.icon &&
+        lhs.execute == rhs.execute &&
+        lhs.parameters == rhs.parameters &&
         lhs.contentTypes == rhs.contentTypes &&
         lhs.entityTypes == rhs.entityTypes &&
-        lhs.sourceContexts == rhs.sourceContexts &&
-        lhs.tools == rhs.tools
+        lhs.sourceContexts == rhs.sourceContexts
     }
 
     func matchingActions(
@@ -105,22 +130,28 @@ final class SkillLoader {
         context: ClipboardContext,
         executor: ToolExecutor
     ) -> [SuggestedAction] {
-        var result: [SuggestedAction] = []
+        var ranked: [(skill: Skill, order: Int, score: Int)] = []
 
-        for skill in skills {
+        for (order, skill) in skills.enumerated() {
             guard skillMatches(skill, contentKind: contentKind, entities: entities, sourceContext: sourceContext) else {
                 continue
             }
 
-            for tool in skill.tools {
-                guard toolMatches(tool, skill: skill, contentKind: contentKind, entities: entities, sourceContext: sourceContext) else {
-                    continue
-                }
-                result.append(toSuggestedAction(tool, context: context, executor: executor))
-            }
+            ranked.append((
+                skill: skill,
+                order: order,
+                score: relevanceScore(for: skill, context: context, sourceContext: sourceContext)
+            ))
         }
 
-        return result
+        return ranked
+            .sorted {
+                if $0.score == $1.score {
+                    return $0.order < $1.order
+                }
+                return $0.score > $1.score
+            }
+            .map { toSuggestedAction($0.skill, context: context, executor: executor) }
     }
 
     // MARK: - Matching
@@ -143,40 +174,57 @@ final class SkillLoader {
         return true
     }
 
-    private func toolMatches(
-        _ tool: ToolDefinition,
-        skill: Skill,
-        contentKind: ClipboardContentKind,
-        entities: [DetectedEntityType],
-        sourceContext: SourceAppContext
-    ) -> Bool {
-        let entityTypes = tool.parsedEntityTypes
-        if !entityTypes.isEmpty {
-            guard entityTypes.contains(where: { $0.matchesAny(entities) }) else { return false }
-        }
-        let sourceContexts = tool.parsedSourceContexts
-        if !sourceContexts.isEmpty {
-            guard sourceContexts.contains(where: { $0.matches(sourceContext) }) else { return false }
-        }
-        return true
-    }
-
     // MARK: - Conversion
 
     private func toSuggestedAction(
-        _ tool: ToolDefinition,
+        _ skill: Skill,
         context: ClipboardContext,
         executor: ToolExecutor
     ) -> SuggestedAction {
-        let subtitle = tool.executeFunction?.displayName
+        let subtitle = skill.executeFunction?.displayName
         return SuggestedAction(
-            title: tool.description,
+            title: skill.description,
             subtitle: subtitle,
-            systemImage: tool.icon
-        ) { [weak executor] completion in
-            guard let executor else { return }
-            executor.execute(tool: tool, context: context, completion: completion)
+            systemImage: skill.icon
+        ) { [weak executor] completion, onToken in
+            guard let executor else { return nil }
+            return executor.execute(
+                skill: skill,
+                context: context,
+                completion: completion,
+                onToken: onToken
+            )
         }
+    }
+
+    private func relevanceScore(
+        for skill: Skill,
+        context: ClipboardContext,
+        sourceContext: SourceAppContext
+    ) -> Int {
+        let textLength = context.snapshot.plainText?.count ?? 0
+        let sourceBoost = skill.parsedSourceBoosts[sourceContext] ?? 0
+        let entityBoost = skill.entityTypes.isEmpty ? 0 : 40
+
+        let lengthBoost: Int
+        if let min = skill.minimumCharacterCount, textLength >= min {
+            lengthBoost = 30
+        } else if let max = skill.maximumCharacterCount, textLength > 0, textLength <= max {
+            lengthBoost = 15
+        } else {
+            lengthBoost = 0
+        }
+
+        let lengthPenalty: Int
+        if let min = skill.minimumCharacterCount, textLength > 0, textLength < min {
+            lengthPenalty = -25
+        } else if let max = skill.maximumCharacterCount, textLength > max {
+            lengthPenalty = -10
+        } else {
+            lengthPenalty = 0
+        }
+
+        return sourceBoost + entityBoost + lengthBoost + lengthPenalty
     }
 
     // MARK: - Custom Skills
@@ -201,13 +249,15 @@ final class SkillLoader {
 
             let id = entry.lastPathComponent
             do {
-                let skill = try SkillParser.parse(id: id, content: content, isBuiltIn: false)
-                if let existingIndex = skills.firstIndex(where: { $0.id == id }) {
-                    skills[existingIndex] = skill
-                    Logger.info("Custom skill '\(id)' overrides built-in", category: .general)
-                } else {
-                    skills.append(skill)
-                    Logger.info("Loaded custom skill '\(id)'", category: .general)
+                let parsed = try SkillParser.parseAll(id: id, content: content, isBuiltIn: false)
+                for skill in parsed {
+                    if let existingIndex = skills.firstIndex(where: { $0.id == skill.id }) {
+                        skills[existingIndex] = skill
+                        Logger.info("Custom skill '\(skill.id)' overrides built-in", category: .general)
+                    } else {
+                        skills.append(skill)
+                        Logger.info("Loaded custom skill '\(skill.id)'", category: .general)
+                    }
                 }
             } catch {
                 Logger.error("Failed to parse custom skill '\(id)': \(error)", category: .general)
