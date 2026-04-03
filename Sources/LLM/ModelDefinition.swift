@@ -43,7 +43,7 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             id: "gemma-4-e2b",
             name: "Gemma 4 E2B Instruct",
             repo: "ggml-org/gemma-4-E2B-it-GGUF",
-            filename: "gemma-4-E2B-it-Q8_0.gguf",
+            filename: "gemma-4-e2b-it-Q8_0.gguf",
             sizeLabel: "~2 GB",
             chatTemplate: .gemma
         ),
@@ -51,7 +51,7 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             id: "gemma-4-e4b",
             name: "Gemma 4 E4B Instruct",
             repo: "ggml-org/gemma-4-E4B-it-GGUF",
-            filename: "gemma-4-E4B-it-Q8_0.gguf",
+            filename: "gemma-4-e4b-it-Q8_0.gguf",
             sizeLabel: "~4 GB",
             chatTemplate: .gemma
         ),
