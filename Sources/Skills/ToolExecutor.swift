@@ -35,6 +35,10 @@ final class ToolExecutor {
         }
     }
 
+    private var modelDefaultTemperature: Float {
+        LocalLLMService.shared.currentModelDefinition?.defaultTemperature ?? 0.3
+    }
+
     @discardableResult
     private func execute(
         function: ExecuteFunction,
@@ -141,7 +145,7 @@ final class ToolExecutor {
                 return executeLLMPrompt(
                     prompt: prompt,
                     systemPrompt: systemPrompt,
-                    temperature: temperature ?? 0.3,
+                    temperature: temperature ?? modelDefaultTemperature,
                     promptSource: sourceMetadata(named: "prompt", parameters: parameters),
                     context: context,
                     completion: completion,
@@ -155,7 +159,7 @@ final class ToolExecutor {
                 return executeLLMAgent(
                     prompt: prompt,
                     systemPrompt: systemPrompt,
-                    temperature: temperature ?? 0.1,
+                    temperature: temperature ?? max(0.1, modelDefaultTemperature),
                     tools: tools,
                     promptSource: sourceMetadata(named: "prompt", parameters: parameters),
                     context: context,

@@ -314,9 +314,11 @@ actor LlamaContext {
         // Clear KV cache
         llama_memory_clear(llama_get_memory(context), true)
 
-        // Build sampler chain
+        // Build sampler chain: top_k → top_p → temp → dist
         let sparams = llama_sampler_chain_default_params()
         let sampler = llama_sampler_chain_init(sparams)!
+        llama_sampler_chain_add(sampler, llama_sampler_init_top_k(64))
+        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.95, 1))
         llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature))
         llama_sampler_chain_add(sampler, llama_sampler_init_dist(UInt32.random(in: 0...UInt32.max)))
         defer { llama_sampler_free(sampler) }

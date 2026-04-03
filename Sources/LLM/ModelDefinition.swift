@@ -7,6 +7,7 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
     let filename: String
     let sizeLabel: String
     let chatTemplate: ChatTemplate
+    let defaultTemperature: Float
 
     var downloadURL: URL {
         URL(string: "https://huggingface.co/\(repo)/resolve/main/\(filename)")!
@@ -29,7 +30,8 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             repo: "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
             filename: "LFM2.5-1.2B-Instruct-Q8_0.gguf",
             sizeLabel: "~1.2 GB",
-            chatTemplate: .lfm
+            chatTemplate: .lfm,
+            defaultTemperature: 0.3
         ),
         ModelDefinition(
             id: "lfm-350m",
@@ -37,23 +39,26 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             repo: "LiquidAI/LFM2.5-350M-GGUF",
             filename: "LFM2.5-350M-Q8_0.gguf",
             sizeLabel: "~350 MB",
-            chatTemplate: .lfm
+            chatTemplate: .lfm,
+            defaultTemperature: 0.3
         ),
         ModelDefinition(
             id: "gemma-4-e2b",
             name: "Gemma 4 E2B Instruct",
             repo: "ggml-org/gemma-4-E2B-it-GGUF",
             filename: "gemma-4-e2b-it-Q8_0.gguf",
-            sizeLabel: "~2 GB",
-            chatTemplate: .gemma
+            sizeLabel: "~5 GB",
+            chatTemplate: .gemma,
+            defaultTemperature: 1.0
         ),
         ModelDefinition(
             id: "gemma-4-e4b",
             name: "Gemma 4 E4B Instruct",
             repo: "ggml-org/gemma-4-E4B-it-GGUF",
             filename: "gemma-4-e4b-it-Q8_0.gguf",
-            sizeLabel: "~4 GB",
-            chatTemplate: .gemma
+            sizeLabel: "~8 GB",
+            chatTemplate: .gemma,
+            defaultTemperature: 1.0
         ),
     ]
 
