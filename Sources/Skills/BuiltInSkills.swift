@@ -276,7 +276,6 @@ description: Extract emails, URLs, phones, dates from text
 icon: tablecells
 content-types: text
 text-source: clipboardLLM
-tools: copyToClipboard
 temperature: 0
 minimum-chars: 50
 source-boosts:
@@ -288,11 +287,12 @@ source-boosts:
 You are a data extractor. Find structured data in the text below.
 
 Rules:
-- Extract ONLY data explicitly present in the text
-- Group by type: Emails, URLs, Phone numbers, Dates, Names, Amounts
-- Skip types with zero matches
-- NEVER invent, guess, or hallucinate data
-- Use copyToClipboard to copy the extracted list
+- Extract ONLY data that is explicitly written in the text
+- Group by type using these headers: Emails, URLs, Phone Numbers, Dates, Names
+- List each item on its own line with "- " prefix
+- Skip any type that has zero matches — do not include empty sections
+- NEVER invent, guess, or approximate any data
+- If nothing is found, say "No structured data found."
 - Output only the grouped list, nothing else
 """
 
