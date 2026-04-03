@@ -226,6 +226,7 @@ icon: tablecells
 content-types: text
 text-source: clipboardLLM
 tools: copyToClipboard
+temperature: 0
 minimum-chars: 50
 source-boosts:
   browser: 70
@@ -233,9 +234,16 @@ source-boosts:
   notes: 50
 ---
 
-Extract structured data from the text: emails, URLs, phone numbers, dates, names, amounts.
-Return as a clean list grouped by type. Skip types with no matches.
-If you find data, use copyToClipboard to copy the extracted list.
+Extract ONLY data that is explicitly present in the text. Group by type:
+- Emails
+- URLs
+- Phone numbers
+- Dates
+- Names
+- Amounts
+
+Skip types with zero matches. Do NOT invent or guess any data.
+If you find data, use copyToClipboard to copy the list.
 """
 
     // MARK: - Places

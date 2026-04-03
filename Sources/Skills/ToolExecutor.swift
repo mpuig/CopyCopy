@@ -27,7 +27,7 @@ final class ToolExecutor {
             let function = try ToolValidator.validateExecuteFunction(skill.execute)
             try ToolValidator.validateJSONObjectParameters(skill.parameters)
             let parameters = try resolveParameters(skill.parameters, context: context)
-            return execute(function: function, parameters: parameters, context: context, completion: completion, onToken: onToken, onStatus: onStatus, tools: skill.tools)
+            return execute(function: function, parameters: parameters, context: context, completion: completion, onToken: onToken, onStatus: onStatus, tools: skill.tools, temperature: skill.temperature)
         } catch {
             Logger.error("Tool execution failed for '\(skill.id)': \(error)", category: .actions)
             completion("Failed: \(error.localizedDescription)", false)
@@ -43,7 +43,8 @@ final class ToolExecutor {
         completion: @escaping ActionCompletion,
         onToken: @escaping StreamCallback = { _ in },
         onStatus: @escaping StatusCallback = { _ in },
-        tools: [String] = []
+        tools: [String] = [],
+        temperature: Float? = nil
     ) -> (() -> Void)? {
         do {
             switch function {
@@ -140,6 +141,7 @@ final class ToolExecutor {
                 return executeLLMPrompt(
                     prompt: prompt,
                     systemPrompt: systemPrompt,
+                    temperature: temperature ?? 0.3,
                     promptSource: sourceMetadata(named: "prompt", parameters: parameters),
                     context: context,
                     completion: completion,
@@ -153,6 +155,7 @@ final class ToolExecutor {
                 return executeLLMAgent(
                     prompt: prompt,
                     systemPrompt: systemPrompt,
+                    temperature: temperature ?? 0.1,
                     tools: tools,
                     promptSource: sourceMetadata(named: "prompt", parameters: parameters),
                     context: context,
@@ -391,6 +394,7 @@ final class ToolExecutor {
     private func executeLLMPrompt(
         prompt: String,
         systemPrompt: String,
+        temperature: Float,
         promptSource: String?,
         context: ClipboardContext,
         completion: @escaping ActionCompletion,
@@ -406,7 +410,7 @@ final class ToolExecutor {
                     try await LocalLLMService.shared.generate(
                         prompt: self.truncate(preparedPrompt),
                         systemPrompt: systemPrompt,
-                        temperature: 0.3,
+                        temperature: temperature,
                         maxTokens: 800,
                         onToken: { token in
                             Task { @MainActor in onToken(token) }
@@ -431,6 +435,7 @@ final class ToolExecutor {
     private func executeLLMAgent(
         prompt: String,
         systemPrompt: String,
+        temperature: Float,
         tools: [String],
         promptSource: String?,
         context: ClipboardContext,
@@ -448,7 +453,7 @@ final class ToolExecutor {
                     try await LocalLLMService.shared.generate(
                         prompt: self.truncate(preparedPrompt),
                         systemPrompt: combinedSystemPrompt,
-                        temperature: 0.3,
+                        temperature: temperature,
                         maxTokens: 800,
                         onToken: { token in
                             Task { @MainActor in onToken(token) }

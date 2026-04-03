@@ -40,6 +40,9 @@ enum SkillMarkdownFormatter {
         if let max = skill.maximumCharacterCount {
             lines.append("maximum-chars: \(max)")
         }
+        if let temp = skill.temperature {
+            lines.append("temperature: \(temp)")
+        }
         if let boosts = skill.sourceBoosts, !boosts.isEmpty {
             lines.append("source-boosts:")
             for (key, value) in boosts.sorted(by: { $0.key < $1.key }) {

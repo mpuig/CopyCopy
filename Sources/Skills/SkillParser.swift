@@ -37,6 +37,7 @@ enum SkillParser {
                     minimumCharacterCount: tool.minimumCharacterCount,
                     maximumCharacterCount: tool.maximumCharacterCount,
                     tools: [],
+                    temperature: nil,
                     isBuiltIn: isBuiltIn
                 )
             }
@@ -137,6 +138,7 @@ enum SkillParser {
             minimumCharacterCount: minimumCharacterCount,
             maximumCharacterCount: maximumCharacterCount,
             tools: [],
+            temperature: frontmatter["temperature"].flatMap(Float.init),
             isBuiltIn: isBuiltIn
         )
 
@@ -176,6 +178,7 @@ enum SkillParser {
                 minimumCharacterCount: filters.minimumCharacterCount,
                 maximumCharacterCount: filters.maximumCharacterCount,
                 tools: [],
+                temperature: filters.temperature,
                 isBuiltIn: isBuiltIn
             )
         }
@@ -205,6 +208,7 @@ enum SkillParser {
             minimumCharacterCount: filters.minimumCharacterCount,
             maximumCharacterCount: filters.maximumCharacterCount,
             tools: declaredTools,
+            temperature: filters.temperature,
             isBuiltIn: isBuiltIn
         )
     }
@@ -356,6 +360,7 @@ enum SkillParser {
         let sourceBoosts: [String: Int]?
         let minimumCharacterCount: Int?
         let maximumCharacterCount: Int?
+        let temperature: Float?
     }
 
     private static func parseCommonFilters(_ frontmatter: [String: String]) -> CommonFilters {
@@ -374,7 +379,8 @@ enum SkillParser {
                 return boosts.isEmpty ? nil : boosts
             }(),
             minimumCharacterCount: (frontmatter["minimum-chars"] ?? frontmatter["minimum_characters"]).flatMap(Int.init),
-            maximumCharacterCount: (frontmatter["maximum-chars"] ?? frontmatter["maximum_characters"]).flatMap(Int.init)
+            maximumCharacterCount: (frontmatter["maximum-chars"] ?? frontmatter["maximum_characters"]).flatMap(Int.init),
+            temperature: frontmatter["temperature"].flatMap(Float.init)
         )
     }
 

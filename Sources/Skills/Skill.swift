@@ -14,6 +14,7 @@ struct Skill: Identifiable, Equatable {
     let minimumCharacterCount: Int?
     let maximumCharacterCount: Int?
     let tools: [String]
+    let temperature: Float?
     let isBuiltIn: Bool
 
     var executeFunction: ExecuteFunction? {
