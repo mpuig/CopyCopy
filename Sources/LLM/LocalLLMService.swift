@@ -39,21 +39,23 @@ final class LocalLLMService: ObservableObject {
         }
 
         if isReady, loadedModelId == definition.id { return }
-        guard !isLoading else { return }
 
+        // Unload previous model
         if loadedModelId != nil, loadedModelId != definition.id {
             llamaContext = nil
             loadedModelId = nil
             isReady = false
         }
 
+        let alreadyDownloaded = definition.isDownloaded
         isLoading = true
-        loadingProgress = "Preparing model..."
+        isReady = false
+        loadingProgress = alreadyDownloaded ? "Loading model..." : "Preparing model..."
         errorMessage = nil
         downloadProgress = 0
 
         do {
-            let localPath = try await ensureModelDownloaded(definition)
+            let localPath = alreadyDownloaded ? definition.localPath : try await ensureModelDownloaded(definition)
             loadingProgress = "Loading model..."
 
             let context = try await Task.detached(priority: .userInitiated) {
