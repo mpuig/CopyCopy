@@ -8,20 +8,18 @@ import SwiftUI
 @MainActor
 final class LocalLLMService: ObservableObject {
     static let shared = LocalLLMService()
-    
+
+    static let defaultModelId = "LiquidAI/LFM2.5-1.2B-Instruct-MLX-8bit"
+
     @Published var isLoading = false
     @Published var isReady = false
     @Published var loadingProgress: String = ""
     @Published var downloadProgress: Double = 0
     @Published var errorMessage: String?
-    
+
     private var modelContainer: ModelContainer?
-    private let modelId = "LiquidAI/LFM2.5-1.2B-Instruct-MLX-8bit"
-    
-    private var modelConfiguration: ModelConfiguration {
-        ModelConfiguration(id: modelId)
-    }
-    
+    private(set) var loadedModelId: String?
+
     private init() {}
 
     func waitUntilReady() async {
@@ -29,28 +27,36 @@ final class LocalLLMService: ObservableObject {
             try? await Task.sleep(nanoseconds: 200_000_000)
         }
     }
-    
+
+    var currentModelId: String {
+        UserDefaults.standard.string(forKey: "llmModel") ?? Self.defaultModelId
+    }
+
     func loadModel() async {
-        guard !isReady && !isLoading else { return }
-        
+        let modelId = currentModelId
+
+        // If already loaded with the same model, skip
+        if isReady, loadedModelId == modelId { return }
+        guard !isLoading else { return }
+
+        // Unload previous model if switching
+        if loadedModelId != nil, loadedModelId != modelId {
+            modelContainer = nil
+            loadedModelId = nil
+            isReady = false
+        }
+
         isLoading = true
         loadingProgress = "Loading model..."
         errorMessage = nil
         downloadProgress = 0
-        
+
         do {
-            // Setup cache directory in app's Application Support
-            let cacheDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?.appendingPathComponent("CopyCopy/Models")
-            if let cacheDir = cacheDir {
-                try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
-            }
-            
-            let hub = HubApi(downloadBase: cacheDir)
-            
-            // Download and load the model
+            let configuration = ModelConfiguration(id: modelId)
+
             let container = try await LLMModelFactory.shared.loadContainer(
-                hub: hub,
-                configuration: modelConfiguration
+                hub: HubApi(),
+                configuration: configuration
             ) { [weak self] progress in
                 Task { @MainActor in
                     self?.downloadProgress = progress.fractionCompleted
@@ -62,20 +68,21 @@ final class LocalLLMService: ObservableObject {
                     }
                 }
             }
-            
+
             modelContainer = container
+            loadedModelId = modelId
             isReady = true
-            loadingProgress = "Model ready ✓"
-            Logger.info("Local LLM model loaded successfully", category: .general)
+            loadingProgress = "Model ready"
+            Logger.info("Local LLM model loaded: \(modelId)", category: .general)
         } catch {
             isReady = false
             errorMessage = "Failed to load model: \(error.localizedDescription)"
             Logger.error("Failed to load local LLM: \(error)", category: .general)
         }
-        
+
         isLoading = false
     }
-    
+
     func generate(
         prompt: String,
         systemPrompt: String = "You are a helpful assistant.",
@@ -108,7 +115,7 @@ final class LocalLLMService: ObservableObject {
             )
         }.value
     }
-    
+
     func summarize(
         _ text: String,
         onToken: (@Sendable (String) -> Void)? = nil
@@ -249,7 +256,7 @@ final class LocalLLMService: ObservableObject {
             return output.trimmingCharacters(in: .whitespacesAndNewlines)
         }
     }
-    
+
 }
 
 enum LocalLLMError: Error, LocalizedError {
