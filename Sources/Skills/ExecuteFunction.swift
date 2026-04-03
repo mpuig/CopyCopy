@@ -18,6 +18,7 @@ enum ExecuteFunction: String, CaseIterable {
     case openInTerminal
     case ping
     case llmPrompt
+    case llmAgent
     case summarize
     case openStaticURL
 
@@ -40,6 +41,7 @@ enum ExecuteFunction: String, CaseIterable {
         case .openInTerminal: return "Open in Terminal"
         case .ping: return "Ping Host"
         case .llmPrompt: return "AI"
+        case .llmAgent: return "AI Agent"
         case .summarize: return "Summarize"
         case .openStaticURL: return "Open URL"
         }

@@ -13,6 +13,7 @@ struct Skill: Identifiable, Equatable {
     let sourceBoosts: [String: Int]?
     let minimumCharacterCount: Int?
     let maximumCharacterCount: Int?
+    let tools: [String]
     let isBuiltIn: Bool
 
     var executeFunction: ExecuteFunction? {

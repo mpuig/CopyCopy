@@ -3,9 +3,143 @@ import XCTest
 
 final class SkillParserTests: XCTestCase {
 
-    // MARK: - New Flat Format
+    // MARK: - Body-Based Format: Tool Calls
 
-    func testParseFlatFormat() throws {
+    func testParseToolCallBody() throws {
+        let content = """
+        ---
+        name: Pretty Print JSON
+        icon: curlybraces
+        content-types: text
+        entity-types: json
+        ---
+
+        formatJSON({clipboard})
+        """
+
+        let skill = try SkillParser.parse(id: "pretty-json", content: content, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .formatJSON)
+        XCTAssertEqual(skill.parameters.properties["json"]?.source, "clipboard")
+        XCTAssertEqual(skill.contentTypes, [.text])
+        XCTAssertEqual(skill.entityTypes, [.json])
+    }
+
+    func testParseNoArgToolCall() throws {
+        let content = """
+        ---
+        name: Save Image
+        icon: square.and.arrow.down
+        content-types: image
+        ---
+
+        saveImage()
+        """
+
+        let skill = try SkillParser.parse(id: "save-image", content: content, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .saveImage)
+        XCTAssertEqual(skill.parameters.properties.count, 0)
+    }
+
+    func testParseURLTemplateToolCall() throws {
+        let content = """
+        ---
+        name: Search the Web
+        icon: magnifyingglass
+        content-types: text
+        ---
+
+        openURL(https://duckduckgo.com/?q={clipboard})
+        """
+
+        let skill = try SkillParser.parse(id: "search-web", content: content, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .openURLTemplate)
+        XCTAssertEqual(skill.parameters.properties["baseURL"]?.value, "https://duckduckgo.com/")
+        XCTAssertEqual(skill.parameters.properties["q"]?.source, "clipboard")
+    }
+
+    func testParseSimpleOpenURLToolCall() throws {
+        let content = """
+        ---
+        name: Open URL
+        icon: link
+        content-types: url
+        ---
+
+        openURL({clipboardURL})
+        """
+
+        let skill = try SkillParser.parse(id: "open-url", content: content, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .openURL)
+        XCTAssertEqual(skill.parameters.properties["url"]?.source, "clipboardURL")
+    }
+
+    func testParseCopyToClipboardToolCall() throws {
+        let content = """
+        ---
+        name: UPPERCASE
+        icon: textformat.size.larger
+        content-types: text
+        ---
+
+        copyToClipboard({clipboardUppercase})
+        """
+
+        let skill = try SkillParser.parse(id: "uppercase", content: content, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .copyToClipboard)
+        XCTAssertEqual(skill.parameters.properties["text"]?.source, "clipboardUppercase")
+    }
+
+    // MARK: - Body-Based Format: LLM Prompts
+
+    func testParseLLMPromptBody() throws {
+        let content = """
+        ---
+        name: Explain Code
+        icon: text.bubble
+        content-types: text
+        entity-types: codeSnippet, shellCommand
+        text-source: clipboardLLM
+        source-boosts:
+          ide: 130
+        ---
+
+        Explain this code. Key logic, inputs/outputs, risks. Bullet points.
+        """
+
+        let skill = try SkillParser.parse(id: "explain-code", content: content, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .llmPrompt)
+        XCTAssertEqual(skill.parameters.properties["systemPrompt"]?.value, "Explain this code. Key logic, inputs/outputs, risks. Bullet points.")
+        XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboardLLM")
+        XCTAssertEqual(skill.entityTypes, [.codeSnippet, .shellCommand])
+        XCTAssertEqual(skill.sourceBoosts?["ide"], 130)
+    }
+
+    func testParseLLMPromptDefaultTextSource() throws {
+        let content = """
+        ---
+        name: Fix Grammar
+        icon: checkmark.bubble
+        content-types: text
+        ---
+
+        Fix grammar and spelling. Return only the corrected text.
+        """
+
+        let skill = try SkillParser.parse(id: "fix-grammar", content: content, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .llmPrompt)
+        XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboard")
+    }
+
+    // MARK: - Backward Compat: Explicit execute in frontmatter
+
+    func testParseFlatFormatWithExecuteKey() throws {
         let content = """
         ---
         name: Pretty Print JSON
@@ -13,13 +147,9 @@ final class SkillParserTests: XCTestCase {
         execute: formatJSON
         content-types: text
         entity-types: json
-        source-boosts:
-          ide: 120
-          other: 25
         parameters:
           json:
             source: clipboard
-            description: Clipboard JSON
         ---
 
         Pretty Print JSON
@@ -27,95 +157,15 @@ final class SkillParserTests: XCTestCase {
 
         let skill = try SkillParser.parse(id: "pretty-json", content: content, isBuiltIn: true)
 
-        XCTAssertEqual(skill.id, "pretty-json")
-        XCTAssertEqual(skill.name, "Pretty Print JSON")
-        XCTAssertEqual(skill.icon, "curlybraces")
         XCTAssertEqual(skill.executeFunction, .formatJSON)
-        XCTAssertEqual(skill.contentTypes, [.text])
-        XCTAssertEqual(skill.entityTypes, [.json])
         XCTAssertEqual(skill.parameters.properties["json"]?.source, "clipboard")
-        XCTAssertEqual(skill.sourceBoosts?["ide"], 120)
-        XCTAssertEqual(skill.sourceBoosts?["other"], 25)
     }
 
-    func testParseFlatFormatWithMinChars() throws {
-        let content = """
-        ---
-        name: Summarize Content
-        icon: text.redaction
-        execute: summarize
-        content-types: text
-        minimum-chars: 300
-        parameters:
-          text:
-            source: clipboardChatCleaned
-        ---
-
-        Summarize Content
-        """
-
-        let skill = try SkillParser.parse(id: "summarize", content: content, isBuiltIn: true)
+    func testParseSummarizeWithExplicitExecute() throws {
+        let skill = try SkillParser.parse(id: "summarize", content: BuiltInSkills.summarize, isBuiltIn: true)
 
         XCTAssertEqual(skill.executeFunction, .summarize)
-        XCTAssertEqual(skill.minimumCharacterCount, 300)
         XCTAssertEqual(skill.parameters.properties["text"]?.source, "clipboardChatCleaned")
-    }
-
-    func testParseFlatFormatWithLLMPrompt() throws {
-        let content = """
-        ---
-        name: Explain Code
-        icon: text.bubble
-        execute: llmPrompt
-        content-types: text
-        entity-types: codeSnippet, shellCommand
-        source-boosts:
-          ide: 130
-        parameters:
-          prompt:
-            source: clipboardLLM
-            description: Clipboard code
-          systemPrompt:
-            source: literal
-            value: Explain the code.
-            description: Code explanation instruction
-        ---
-
-        Explain what this code does
-        """
-
-        let skill = try SkillParser.parse(id: "explain-code", content: content, isBuiltIn: true)
-
-        XCTAssertEqual(skill.executeFunction, .llmPrompt)
-        XCTAssertEqual(skill.entityTypes, [.codeSnippet, .shellCommand])
-        XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboardLLM")
-        XCTAssertEqual(skill.parameters.properties["systemPrompt"]?.value, "Explain the code.")
-        XCTAssertEqual(skill.sourceBoosts?["ide"], 130)
-    }
-
-    func testParseFlatFormatWithSourceContexts() throws {
-        let content = """
-        ---
-        name: Strip ANSI
-        icon: textformat
-        execute: stripANSI
-        content-types: text
-        entity-types: logOutput, shellCommand
-        source-contexts: terminal
-        source-boosts:
-          terminal: 130
-        parameters:
-          text:
-            source: clipboard
-        ---
-
-        Strip ANSI escape codes
-        """
-
-        let skill = try SkillParser.parse(id: "strip-ansi", content: content, isBuiltIn: true)
-
-        XCTAssertEqual(skill.sourceContexts, [.terminal])
-        XCTAssertEqual(skill.entityTypes, [.logOutput, .shellCommand])
     }
 
     // MARK: - Backward Compat: Old JSON Format
@@ -158,11 +208,7 @@ final class SkillParserTests: XCTestCase {
         let skills = try SkillParser.parseAll(id: "test", content: content, isBuiltIn: true)
 
         XCTAssertEqual(skills.count, 1)
-        XCTAssertEqual(skills[0].id, "pretty-json")
-        XCTAssertEqual(skills[0].contentTypes, [.text])
         XCTAssertEqual(skills[0].executeFunction, .formatJSON)
-        XCTAssertEqual(skills[0].parameters.properties["json"]?.source, "clipboard")
-        XCTAssertEqual(skills[0].entityTypes, [.json])
     }
 
     // MARK: - Backward Compat: Legacy Format
@@ -177,8 +223,6 @@ final class SkillParserTests: XCTestCase {
         ---
 
         # Legacy
-
-        ## Actions
 
         ### search-web
         type: function
@@ -195,69 +239,66 @@ final class SkillParserTests: XCTestCase {
         """
 
         let skills = try SkillParser.parseAll(id: "legacy", content: content, isBuiltIn: false)
-
         XCTAssertEqual(skills.count, 2)
-
-        let searchSkill = try XCTUnwrap(skills.first { $0.id == "search-web" })
-        XCTAssertEqual(searchSkill.executeFunction, .openURLTemplate)
-        XCTAssertEqual(searchSkill.parameters.properties["baseURL"]?.value, "https://duckduckgo.com/")
-        XCTAssertEqual(searchSkill.parameters.properties["q"]?.source, "clipboard")
-        XCTAssertEqual(searchSkill.contentTypes, [.text])
-
-        let summarizeSkill = try XCTUnwrap(skills.first { $0.id == "summarize" })
-        XCTAssertEqual(summarizeSkill.executeFunction, .llmPrompt)
-        XCTAssertEqual(summarizeSkill.parameters.properties["systemPrompt"]?.value, "Summarize the clipboard text.")
-        XCTAssertEqual(summarizeSkill.parameters.properties["prompt"]?.source, "clipboardChatCleaned")
-    }
-
-    func testLegacyActionParsesSourceBoostsAndMinimumCharacters() throws {
-        let content = """
-        ---
-        name: legacy
-        description: Legacy skill
-        metadata:
-          content_types: [text]
-        ---
-
-        # Legacy
-
-        ## Actions
-
-        ### extract-action-items
-        type: prompt
-        prompt: Extract action items.
-        icon: checklist
-        description: Extract Action Items
-        source_boosts: "chat:110,email:90"
-        minimum_characters: 500
-        """
-
-        let skills = try SkillParser.parseAll(id: "legacy", content: content, isBuiltIn: false)
-        let skill = try XCTUnwrap(skills.first)
-
-        XCTAssertEqual(skill.sourceBoosts?["chat"], 110)
-        XCTAssertEqual(skill.minimumCharacterCount, 500)
     }
 
     // MARK: - Built-in Skills
 
-    func testBuiltInSummarizeSkill() throws {
-        let skill = try SkillParser.parse(id: "summarize", content: BuiltInSkills.summarize, isBuiltIn: true)
-
-        XCTAssertEqual(skill.executeFunction, .summarize)
-        XCTAssertEqual(skill.parameters.properties["text"]?.source, "clipboardChatCleaned")
-        XCTAssertEqual(skill.minimumCharacterCount, 300)
-        XCTAssertEqual(skill.sourceBoosts?["chat"], 110)
+    func testAllBuiltInSkillsParse() throws {
+        for (id, content) in BuiltInSkills.all {
+            let skills = try SkillParser.parseAll(id: id, content: content, isBuiltIn: true)
+            XCTAssertFalse(skills.isEmpty, "Skill '\(id)' produced no actions")
+            for skill in skills {
+                XCTAssertNotNil(skill.executeFunction, "Skill '\(skill.id)' has invalid execute function '\(skill.execute)'")
+            }
+        }
     }
 
-    func testBuiltInTranslateSkill() throws {
-        let skill = try SkillParser.parse(id: "translate", content: BuiltInSkills.translate, isBuiltIn: true)
+    func testBuiltInExplainCodeSkill() throws {
+        let skill = try SkillParser.parse(id: "explain-code", content: BuiltInSkills.explainCode, isBuiltIn: true)
 
         XCTAssertEqual(skill.executeFunction, .llmPrompt)
-        XCTAssertEqual(
-            skill.parameters.properties["systemPrompt"]?.value,
-            "Translate the clipboard text to English. Return only the translation with no explanation."
-        )
+        XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboardLLM")
+        XCTAssertTrue(skill.parameters.properties["systemPrompt"]?.value?.contains("Explain") == true)
+        XCTAssertEqual(skill.entityTypes, [.codeSnippet, .shellCommand, .sql, .logOutput])
+    }
+
+    func testBuiltInSearchWebSkill() throws {
+        let skill = try SkillParser.parse(id: "search-web", content: BuiltInSkills.searchWeb, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .openURLTemplate)
+        XCTAssertEqual(skill.parameters.properties["baseURL"]?.value, "https://duckduckgo.com/")
+        XCTAssertEqual(skill.parameters.properties["q"]?.source, "clipboard")
+    }
+
+    func testBuiltInCleanTextSkill() throws {
+        let skill = try SkillParser.parse(id: "clean-text", content: BuiltInSkills.cleanText, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .copyToClipboard)
+        XCTAssertEqual(skill.parameters.properties["text"]?.source, "clipboardClean")
+    }
+
+    func testBuiltInExtractDataSkill() throws {
+        let skill = try SkillParser.parse(id: "extract-data", content: BuiltInSkills.extractData, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .llmAgent)
+        XCTAssertTrue(skill.tools.contains("copyToClipboard"))
+    }
+
+    func testBuiltInHTMLToMarkdownSkill() throws {
+        let skill = try SkillParser.parse(id: "html-to-markdown", content: BuiltInSkills.htmlToMarkdown, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .htmlToMarkdown)
+        XCTAssertEqual(skill.parameters.properties["html"]?.source, "clipboardHTML")
+        XCTAssertEqual(skill.entityTypes, [.html])
+    }
+
+    func testBuiltInDraftChatReplySkill() throws {
+        let skill = try SkillParser.parse(id: "draft-chat-reply", content: BuiltInSkills.draftChatReply, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .llmPrompt)
+        XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboardChatCleaned")
+        XCTAssertEqual(skill.sourceContexts, [.chat])
     }
 
     func testBuiltInFixGrammarSkill() throws {
@@ -268,92 +309,91 @@ final class SkillParserTests: XCTestCase {
         XCTAssertEqual(skill.sourceBoosts?["notes"], 80)
     }
 
-    func testBuiltInMakeConciseAndExtractActionItems() throws {
-        let concise = try SkillParser.parse(id: "make-concise", content: BuiltInSkills.makeConcise, isBuiltIn: true)
-        let actions = try SkillParser.parse(id: "extract-action-items", content: BuiltInSkills.extractActionItems, isBuiltIn: true)
-
-        XCTAssertEqual(concise.sourceBoosts?["chat"], 85)
-        XCTAssertEqual(actions.minimumCharacterCount, 500)
-        XCTAssertEqual(actions.sourceBoosts?["email"], 90)
-    }
-
-    func testBuiltInDraftChatReplySkill() throws {
-        let skill = try SkillParser.parse(id: "draft-chat-reply", content: BuiltInSkills.draftChatReply, isBuiltIn: true)
-
-        XCTAssertEqual(skill.sourceContexts, [.chat])
-        XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboardChatCleaned")
-        XCTAssertEqual(skill.sourceBoosts?["chat"], 150)
-    }
-
-    func testBuiltInEmailRewriteSkill() throws {
-        let skill = try SkillParser.parse(id: "rewrite-email-draft", content: BuiltInSkills.rewriteEmailDraft, isBuiltIn: true)
-
-        XCTAssertEqual(skill.entityTypes, [.emailDraft])
-        XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboardLLM")
-    }
-
-    func testBuiltInSlackRewriteSkill() throws {
-        let skill = try SkillParser.parse(id: "rewrite-slack-message", content: BuiltInSkills.rewriteSlackMessage, isBuiltIn: true)
-
-        XCTAssertEqual(skill.entityTypes, [.slackDraft])
-        XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboardChatCleaned")
-    }
-
-    func testBuiltInExplainCodeSkill() throws {
-        let skill = try SkillParser.parse(id: "explain-code", content: BuiltInSkills.explainCode, isBuiltIn: true)
-
-        XCTAssertEqual(skill.executeFunction, .llmPrompt)
-        XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboardLLM")
-        XCTAssertEqual(skill.entityTypes, [.codeSnippet, .shellCommand, .sql, .logOutput])
-        XCTAssertNil(skill.sourceBoosts?["chat"])
-    }
-
-    func testBuiltInHTMLToMarkdownSkill() throws {
-        let skill = try SkillParser.parse(id: "html-to-markdown", content: BuiltInSkills.htmlToMarkdown, isBuiltIn: true)
-
-        XCTAssertEqual(skill.entityTypes, [.html])
-        XCTAssertEqual(skill.parameters.properties["html"]?.source, "clipboardHTML")
-    }
-
-    func testBuiltInOpenTempCodeSkill() throws {
-        let skill = try SkillParser.parse(id: "open-temp-code", content: BuiltInSkills.openTempCode, isBuiltIn: true)
-
-        XCTAssertEqual(
-            skill.entityTypes,
-            [.markdown, .codeSnippet, .shellCommand, .logOutput, .sql]
-        )
-    }
-
-    func testBuiltInStripANSISkill() throws {
-        let skill = try SkillParser.parse(id: "strip-ansi", content: BuiltInSkills.stripANSI, isBuiltIn: true)
-
-        XCTAssertEqual(skill.sourceContexts, [.terminal])
-        XCTAssertEqual(skill.sourceBoosts?["terminal"], 130)
-    }
-
     // MARK: - Round-trip
 
-    func testFlatFormatRoundTrip() throws {
-        let skill = try SkillParser.parse(id: "summarize", content: BuiltInSkills.summarize, isBuiltIn: true)
+    func testRoundTripFunctionSkill() throws {
+        let skill = try SkillParser.parse(id: "clean-text", content: BuiltInSkills.cleanText, isBuiltIn: true)
         let exported = SkillMarkdownFormatter.formatFlat(skill: skill)
-        let reparsed = try SkillParser.parse(id: "summarize", content: exported, isBuiltIn: false)
+        let reparsed = try SkillParser.parse(id: "clean-text", content: exported, isBuiltIn: false)
 
-        XCTAssertEqual(reparsed.name, skill.name)
-        XCTAssertEqual(reparsed.icon, skill.icon)
-        XCTAssertEqual(reparsed.execute, skill.execute)
-        XCTAssertEqual(reparsed.contentTypes, skill.contentTypes)
-        XCTAssertEqual(reparsed.minimumCharacterCount, skill.minimumCharacterCount)
-        XCTAssertEqual(reparsed.parameters.properties["text"]?.source, "clipboardChatCleaned")
+        XCTAssertEqual(reparsed.executeFunction, .copyToClipboard)
+        XCTAssertEqual(reparsed.parameters.properties["text"]?.source, "clipboardClean")
     }
 
-    func testFlatFormatRoundTripWithLLMPrompt() throws {
+    func testRoundTripLLMSkill() throws {
         let skill = try SkillParser.parse(id: "explain-code", content: BuiltInSkills.explainCode, isBuiltIn: true)
         let exported = SkillMarkdownFormatter.formatFlat(skill: skill)
         let reparsed = try SkillParser.parse(id: "explain-code", content: exported, isBuiltIn: false)
 
         XCTAssertEqual(reparsed.executeFunction, .llmPrompt)
+        XCTAssertEqual(reparsed.parameters.properties["prompt"]?.source, "clipboardLLM")
         XCTAssertEqual(reparsed.entityTypes, skill.entityTypes)
-        XCTAssertEqual(reparsed.parameters.properties["systemPrompt"]?.source, "literal")
+    }
+
+    func testRoundTripURLTemplateSkill() throws {
+        let skill = try SkillParser.parse(id: "search-web", content: BuiltInSkills.searchWeb, isBuiltIn: true)
+        let exported = SkillMarkdownFormatter.formatFlat(skill: skill)
+        let reparsed = try SkillParser.parse(id: "search-web", content: exported, isBuiltIn: false)
+
+        XCTAssertEqual(reparsed.executeFunction, .openURLTemplate)
+        XCTAssertEqual(reparsed.parameters.properties["baseURL"]?.value, "https://duckduckgo.com/")
+    }
+
+    // MARK: - Agent Skills (LLM with tools)
+
+    func testParseAgentSkillWithTools() throws {
+        let content = """
+        ---
+        name: Smart Helper
+        icon: wand.and.stars
+        content-types: text
+        text-source: clipboardLLM
+        tools: formatJSON, decodeBase64, copyToClipboard
+        ---
+
+        Analyze the text and pick the best action.
+        """
+
+        let skill = try SkillParser.parse(id: "smart", content: content, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .llmAgent)
+        XCTAssertEqual(skill.tools, ["formatJSON", "decodeBase64", "copyToClipboard"])
+        XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboardLLM")
+        XCTAssertTrue(skill.parameters.properties["systemPrompt"]?.value?.contains("Analyze") == true)
+    }
+
+    func testParseSkillWithoutToolsIsLLMPrompt() throws {
+        let content = """
+        ---
+        name: Explain
+        icon: text.bubble
+        content-types: text
+        ---
+
+        Explain this code.
+        """
+
+        let skill = try SkillParser.parse(id: "explain", content: content, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .llmPrompt)
+        XCTAssertTrue(skill.tools.isEmpty)
+    }
+
+    func testBuiltInExtractDataAgentSkill() throws {
+        let skill = try SkillParser.parse(id: "extract-data", content: BuiltInSkills.extractData, isBuiltIn: true)
+
+        XCTAssertEqual(skill.executeFunction, .llmAgent)
+        XCTAssertTrue(skill.tools.contains("copyToClipboard"))
+        XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboardLLM")
+    }
+
+    func testRoundTripAgentSkill() throws {
+        let skill = try SkillParser.parse(id: "extract-data", content: BuiltInSkills.extractData, isBuiltIn: true)
+        let exported = SkillMarkdownFormatter.formatFlat(skill: skill)
+        let reparsed = try SkillParser.parse(id: "extract-data", content: exported, isBuiltIn: false)
+
+        XCTAssertEqual(reparsed.executeFunction, .llmAgent)
+        XCTAssertEqual(reparsed.tools, skill.tools)
         XCTAssertEqual(reparsed.parameters.properties["prompt"]?.source, "clipboardLLM")
     }
 

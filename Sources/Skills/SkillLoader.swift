@@ -120,7 +120,8 @@ final class SkillLoader {
         lhs.parameters == rhs.parameters &&
         lhs.contentTypes == rhs.contentTypes &&
         lhs.entityTypes == rhs.entityTypes &&
-        lhs.sourceContexts == rhs.sourceContexts
+        lhs.sourceContexts == rhs.sourceContexts &&
+        lhs.tools == rhs.tools
     }
 
     func matchingActions(

@@ -27,7 +27,7 @@ final class ToolExecutor {
             let function = try ToolValidator.validateExecuteFunction(skill.execute)
             try ToolValidator.validateJSONObjectParameters(skill.parameters)
             let parameters = try resolveParameters(skill.parameters, context: context)
-            return execute(function: function, parameters: parameters, context: context, completion: completion, onToken: onToken, onStatus: onStatus)
+            return execute(function: function, parameters: parameters, context: context, completion: completion, onToken: onToken, onStatus: onStatus, tools: skill.tools)
         } catch {
             Logger.error("Tool execution failed for '\(skill.id)': \(error)", category: .actions)
             completion("Failed: \(error.localizedDescription)", false)
@@ -42,7 +42,8 @@ final class ToolExecutor {
         context: ClipboardContext,
         completion: @escaping ActionCompletion,
         onToken: @escaping StreamCallback = { _ in },
-        onStatus: @escaping StatusCallback = { _ in }
+        onStatus: @escaping StatusCallback = { _ in },
+        tools: [String] = []
     ) -> (() -> Void)? {
         do {
             switch function {
@@ -139,6 +140,20 @@ final class ToolExecutor {
                 return executeLLMPrompt(
                     prompt: prompt,
                     systemPrompt: systemPrompt,
+                    promptSource: sourceMetadata(named: "prompt", parameters: parameters),
+                    context: context,
+                    completion: completion,
+                    onToken: onToken,
+                    onStatus: onStatus
+                )
+
+            case .llmAgent:
+                let prompt = try requiredText(parameters["prompt"] ?? primaryText(from: context))
+                let systemPrompt = parameters["systemPrompt"] ?? "You are a helpful assistant."
+                return executeLLMAgent(
+                    prompt: prompt,
+                    systemPrompt: systemPrompt,
+                    tools: tools,
                     promptSource: sourceMetadata(named: "prompt", parameters: parameters),
                     context: context,
                     completion: completion,
@@ -411,6 +426,136 @@ final class ToolExecutor {
             }
         }
         return { task.cancel() }
+    }
+
+    private func executeLLMAgent(
+        prompt: String,
+        systemPrompt: String,
+        tools: [String],
+        promptSource: String?,
+        context: ClipboardContext,
+        completion: @escaping ActionCompletion,
+        onToken: @escaping StreamCallback,
+        onStatus: @escaping StatusCallback
+    ) -> (() -> Void)? {
+        let task = Task.detached { [weak self] in
+            guard let self else { return }
+            do {
+                await self.ensureModelReady(onStatus: onStatus)
+                let preparedPrompt = try await self.preparePromptForLLM(prompt, source: promptSource, context: context)
+                let combinedSystemPrompt = self.buildAgentSystemPrompt(systemPrompt, tools: tools)
+                let result = try await self.withLLMTimeout {
+                    try await LocalLLMService.shared.generate(
+                        prompt: self.truncate(preparedPrompt),
+                        systemPrompt: combinedSystemPrompt,
+                        temperature: 0.3,
+                        maxTokens: 800,
+                        onToken: { token in
+                            Task { @MainActor in onToken(token) }
+                        }
+                    )
+                }
+
+                // Try to parse as tool call
+                if let toolCallResult = self.parseToolCallResponse(result) {
+                    await MainActor.run {
+                        self.executeToolCall(
+                            toolCallResult,
+                            context: context,
+                            allowedTools: tools,
+                            completion: completion
+                        )
+                    }
+                } else {
+                    await MainActor.run {
+                        self.copyToClipboard(result)
+                        completion(result, true)
+                    }
+                }
+            } catch is CancellationError {
+                // Partial result already streamed via onToken
+            } catch {
+                await MainActor.run {
+                    completion("Failed: \(error.localizedDescription)", false)
+                }
+            }
+        }
+        return { task.cancel() }
+    }
+
+    nonisolated private func buildAgentSystemPrompt(_ userPrompt: String, tools: [String]) -> String {
+        let toolDefs = tools.compactMap { name -> String? in
+            guard let function = ExecuteFunction(rawValue: name) else { return nil }
+            let paramName = agentToolParamName(function)
+            return "- \(name)(\(paramName)): \(function.displayName)"
+        }.joined(separator: "\n")
+
+        return """
+        \(userPrompt)
+
+        Available tools:
+        \(toolDefs)
+
+        To use a tool, respond ONLY with JSON: {"tool": "name", "input": "the text"}
+        Otherwise, respond with plain text.
+        """
+    }
+
+    nonisolated private func agentToolParamName(_ function: ExecuteFunction) -> String {
+        switch function {
+        case .formatJSON: return "json"
+        case .htmlToMarkdown: return "html"
+        case .revealPath, .openInTerminal: return "path"
+        case .ping: return "host"
+        case .openURL, .openStaticURL, .openURLTemplate: return "url"
+        case .openFile, .revealInFinder, .saveImage: return ""
+        default: return "text"
+        }
+    }
+
+    private struct ToolCallResponse {
+        let tool: String
+        let input: String
+    }
+
+    nonisolated private func parseToolCallResponse(_ response: String) -> ToolCallResponse? {
+        let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Strip markdown code fences if present
+        let cleaned: String
+        if trimmed.hasPrefix("```") {
+            let lines = trimmed.components(separatedBy: "\n")
+            let jsonLines = lines.dropFirst().prefix(while: { !$0.hasPrefix("```") })
+            cleaned = jsonLines.joined(separator: "\n")
+        } else {
+            cleaned = trimmed
+        }
+
+        guard cleaned.hasPrefix("{"),
+              let data = cleaned.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tool = json["tool"] as? String else {
+            return nil
+        }
+
+        let input = json["input"] as? String ?? ""
+        return ToolCallResponse(tool: tool, input: input)
+    }
+
+    private func executeToolCall(
+        _ call: ToolCallResponse,
+        context: ClipboardContext,
+        allowedTools: [String],
+        completion: @escaping ActionCompletion
+    ) {
+        guard allowedTools.contains(call.tool),
+              let function = ExecuteFunction(rawValue: call.tool) else {
+            completion("Failed: Tool '\(call.tool)' is not allowed", false)
+            return
+        }
+
+        let paramName = agentToolParamName(function)
+        let parameters = paramName.isEmpty ? [String: String]() : [paramName: call.input]
+        execute(function: function, parameters: parameters, context: context, completion: completion)
     }
 
     private func executeSummarize(

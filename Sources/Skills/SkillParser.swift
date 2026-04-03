@@ -11,33 +11,40 @@ enum SkillParser {
     static func parseAll(id: String, content: String, isBuiltIn: Bool) throws -> [Skill] {
         let (frontmatter, body) = try extractFrontmatter(content)
 
-        // New flat format: frontmatter contains "execute" key → single skill
+        // 1. Explicit execute in frontmatter → current flat format (backward compat)
         if frontmatter["execute"] != nil {
             let skill = try parseFlatSkill(id: id, frontmatter: frontmatter, body: body, isBuiltIn: isBuiltIn)
             return [skill]
         }
 
-        // Old grouped format: JSON tools block or legacy ### sections → one skill per tool
-        let parentFilters = parseParentFilters(frontmatter)
-        let tools = try parseTools(id: id, body: body)
-
-        return tools.map { tool in
-            Skill(
-                id: tool.id,
-                name: tool.name,
-                description: tool.description,
-                icon: tool.icon,
-                execute: tool.execute,
-                parameters: tool.parameters,
-                contentTypes: parentFilters.contentTypes,
-                entityTypes: mergeEntityTypes(parent: parentFilters.entityTypes, tool: tool),
-                sourceContexts: mergeSourceContexts(parent: parentFilters.sourceContexts, tool: tool),
-                sourceBoosts: tool.sourceBoosts,
-                minimumCharacterCount: tool.minimumCharacterCount,
-                maximumCharacterCount: tool.maximumCharacterCount,
-                isBuiltIn: isBuiltIn
-            )
+        // 2. Old grouped format: JSON tools block or legacy ### sections
+        let trimmedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedBody.contains("## Tools") || trimmedBody.contains("### ") {
+            let parentFilters = parseParentFilters(frontmatter)
+            let tools = try parseTools(id: id, body: body)
+            return tools.map { tool in
+                Skill(
+                    id: tool.id,
+                    name: tool.name,
+                    description: tool.description,
+                    icon: tool.icon,
+                    execute: tool.execute,
+                    parameters: tool.parameters,
+                    contentTypes: parentFilters.contentTypes,
+                    entityTypes: mergeEntityTypes(parent: parentFilters.entityTypes, tool: tool),
+                    sourceContexts: mergeSourceContexts(parent: parentFilters.sourceContexts, tool: tool),
+                    sourceBoosts: tool.sourceBoosts,
+                    minimumCharacterCount: tool.minimumCharacterCount,
+                    maximumCharacterCount: tool.maximumCharacterCount,
+                    tools: [],
+                    isBuiltIn: isBuiltIn
+                )
+            }
         }
+
+        // 3. New body-based format: body is tool call or LLM prompt
+        let skill = try parseBodySkill(id: id, frontmatter: frontmatter, body: trimmedBody, isBuiltIn: isBuiltIn)
+        return [skill]
     }
 
     /// Convenience for callers that expect a single skill (backward compat).
@@ -89,7 +96,27 @@ enum SkillParser {
         ) { SourceContextFilter(rawValue: $0) }
 
         let sourceBoosts = parseNestedSourceBoosts(frontmatter)
-        let parameters = parseNestedParameters(frontmatter)
+        var parameters = parseNestedParameters(frontmatter)
+
+        // For LLM execute types with text-source, build parameters from frontmatter
+        let textSource = frontmatter["text-source"]
+        if parameters == .empty, let executeFunc = ExecuteFunction(rawValue: execute) {
+            if executeFunc == .summarize, let source = textSource {
+                parameters = toolParameters(
+                    properties: ["text": sourcedProperty(source: source, description: "Input text")],
+                    required: ["text"]
+                )
+            } else if executeFunc == .llmPrompt {
+                let prompt = body.trimmingCharacters(in: .whitespacesAndNewlines)
+                parameters = toolParameters(
+                    properties: [
+                        "systemPrompt": literalProperty(value: prompt, description: "System prompt"),
+                        "prompt": sourcedProperty(source: textSource ?? "clipboard", description: "Input text"),
+                    ],
+                    required: ["systemPrompt", "prompt"]
+                )
+            }
+        }
 
         let minimumCharacterCount = (frontmatter["minimum-chars"] ?? frontmatter["minimum_characters"]).flatMap(Int.init)
         let maximumCharacterCount = (frontmatter["maximum-chars"] ?? frontmatter["maximum_characters"]).flatMap(Int.init)
@@ -107,11 +134,243 @@ enum SkillParser {
             sourceBoosts: sourceBoosts.isEmpty ? nil : sourceBoosts,
             minimumCharacterCount: minimumCharacterCount,
             maximumCharacterCount: maximumCharacterCount,
+            tools: [],
             isBuiltIn: isBuiltIn
         )
 
         try ToolValidator.validateJSONObjectParameters(skill.parameters)
         return skill
+    }
+
+    // MARK: - Body-Based Format
+
+    private static func parseBodySkill(
+        id: String,
+        frontmatter: [String: String],
+        body: String,
+        isBuiltIn: Bool
+    ) throws -> Skill {
+        guard let name = frontmatter["name"] else {
+            throw ParseError(message: "Skill '\(id)' missing required 'name' field")
+        }
+
+        let icon = frontmatter["icon"] ?? "star"
+        let filters = parseCommonFilters(frontmatter)
+        let declaredTools = parseToolsList(frontmatter["tools"])
+
+        // Try to parse body as a tool call: toolName(args)
+        if let toolCall = parseToolCall(body) {
+            let (execute, parameters) = try buildToolCallParameters(toolCall)
+            return Skill(
+                id: id, name: name, description: name,
+                icon: icon, execute: execute, parameters: parameters,
+                contentTypes: filters.contentTypes,
+                entityTypes: filters.entityTypes,
+                sourceContexts: filters.sourceContexts,
+                sourceBoosts: filters.sourceBoosts,
+                minimumCharacterCount: filters.minimumCharacterCount,
+                maximumCharacterCount: filters.maximumCharacterCount,
+                tools: [],
+                isBuiltIn: isBuiltIn
+            )
+        }
+
+        // Body is an LLM prompt — with or without tool calling
+        let textSource = frontmatter["text-source"] ?? "clipboard"
+        let systemPrompt = body
+        let execute = declaredTools.isEmpty
+            ? ExecuteFunction.llmPrompt.rawValue
+            : ExecuteFunction.llmAgent.rawValue
+
+        let parameters = toolParameters(
+            properties: [
+                "systemPrompt": literalProperty(value: systemPrompt, description: "System prompt"),
+                "prompt": sourcedProperty(source: textSource, description: "Input text"),
+            ],
+            required: ["systemPrompt", "prompt"]
+        )
+
+        return Skill(
+            id: id, name: name, description: body.components(separatedBy: "\n").first(where: { !$0.isEmpty }) ?? name,
+            icon: icon, execute: execute, parameters: parameters,
+            contentTypes: filters.contentTypes,
+            entityTypes: filters.entityTypes,
+            sourceContexts: filters.sourceContexts,
+            sourceBoosts: filters.sourceBoosts,
+            minimumCharacterCount: filters.minimumCharacterCount,
+            maximumCharacterCount: filters.maximumCharacterCount,
+            tools: declaredTools,
+            isBuiltIn: isBuiltIn
+        )
+    }
+
+    private static func parseToolsList(_ value: String?) -> [String] {
+        guard let value else { return [] }
+        return value
+            .components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { ExecuteFunction(rawValue: $0) != nil }
+    }
+
+    private struct ToolCall {
+        let name: String
+        let argument: String
+    }
+
+    private static func parseToolCall(_ body: String) -> ToolCall? {
+        let firstLine = body.components(separatedBy: "\n")
+            .first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })?
+            .trimmingCharacters(in: .whitespaces) ?? ""
+
+        guard let parenOpen = firstLine.firstIndex(of: "("),
+              firstLine.hasSuffix(")") else { return nil }
+
+        let name = String(firstLine[..<parenOpen])
+        guard ExecuteFunction(rawValue: name) != nil else { return nil }
+
+        let argStart = firstLine.index(after: parenOpen)
+        let argEnd = firstLine.index(before: firstLine.endIndex)
+        let argument = argStart < argEnd ? String(firstLine[argStart..<argEnd]) : ""
+
+        return ToolCall(name: name, argument: argument)
+    }
+
+    /// Map from ExecuteFunction to the parameter name ToolExecutor expects.
+    private static let toolParameterNames: [String: String] = [
+        "openURL": "url",
+        "formatJSON": "json",
+        "decodeBase64": "text",
+        "decodeURL": "text",
+        "stripANSI": "text",
+        "htmlToMarkdown": "html",
+        "copyToClipboard": "text",
+        "saveTempFile": "text",
+        "revealPath": "path",
+        "openInTerminal": "path",
+        "ping": "host",
+    ]
+
+    private static func buildToolCallParameters(_ call: ToolCall) throws -> (execute: String, parameters: ToolParameters) {
+        // No-arg tools
+        if call.argument.isEmpty {
+            return (call.name, .empty)
+        }
+
+        let template = call.argument
+
+        // openURL with a full URL template (contains ? or literal URL parts)
+        if call.name == "openURL" || call.name == "openURLTemplate" {
+            return try buildURLToolParameters(template)
+        }
+
+        // Single-arg tools: extract placeholder from template
+        guard let paramName = toolParameterNames[call.name] else {
+            throw ParseError(message: "Unknown tool '\(call.name)' or missing parameter mapping")
+        }
+
+        let placeholder = try extractPlaceholder(from: template)
+        let property = sourcedProperty(
+            source: placeholder.source,
+            description: paramName,
+            prefix: placeholder.prefix,
+            suffix: placeholder.suffix
+        )
+        return (call.name, toolParameters(properties: [paramName: property], required: [paramName]))
+    }
+
+    private static func buildURLToolParameters(_ template: String) throws -> (execute: String, parameters: ToolParameters) {
+        // Simple clipboard URL: openURL({clipboard}) or openURL({clipboardURL})
+        let trimmed = template.trimmingCharacters(in: .whitespaces)
+        if trimmed == "{clipboard}" || trimmed == "{clipboardURL}" || trimmed == "{clipboardTrimmed}" {
+            let placeholder = try extractPlaceholder(from: trimmed)
+            return (
+                ExecuteFunction.openURL.rawValue,
+                toolParameters(
+                    properties: ["url": sourcedProperty(source: placeholder.source, description: "URL")],
+                    required: ["url"]
+                )
+            )
+        }
+
+        // Static URL (no placeholders)
+        if !trimmed.contains("{") {
+            return (
+                ExecuteFunction.openStaticURL.rawValue,
+                toolParameters(
+                    properties: ["url": literalProperty(value: trimmed, description: "URL")],
+                    required: ["url"]
+                )
+            )
+        }
+
+        // URL template with query params: https://example.com/?q={clipboard}
+        if let queryRange = trimmed.range(of: "?") {
+            let baseURL = String(trimmed[..<queryRange.lowerBound])
+            let query = String(trimmed[queryRange.upperBound...])
+
+            var properties: [String: ToolProperty] = [
+                "baseURL": literalProperty(value: baseURL, description: "Base URL"),
+            ]
+            var required = ["baseURL"]
+
+            for item in query.split(separator: "&", omittingEmptySubsequences: false) {
+                let pair = String(item).split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+                guard let name = pair.first, !name.isEmpty else { continue }
+                let value = pair.count > 1 ? String(pair[1]) : ""
+                if value.contains("{") {
+                    let p = try extractPlaceholder(from: value)
+                    properties[String(name)] = sourcedProperty(source: p.source, description: String(name), prefix: p.prefix, suffix: p.suffix)
+                } else {
+                    properties[String(name)] = literalProperty(value: value, description: String(name))
+                }
+                required.append(String(name))
+            }
+
+            return (ExecuteFunction.openURLTemplate.rawValue, toolParameters(properties: properties, required: required))
+        }
+
+        // URL template with path: maps://{clipboard} or https://github.com/{clipboard}
+        let placeholder = try extractPlaceholder(from: trimmed)
+        let baseURL = trimmed.replacingOccurrences(of: placeholder.token, with: "")
+        return (
+            ExecuteFunction.openURLTemplate.rawValue,
+            toolParameters(
+                properties: [
+                    "baseURL": literalProperty(value: baseURL, description: "Base URL"),
+                    "path": sourcedProperty(source: placeholder.source, description: "Path", prefix: placeholder.prefix, suffix: placeholder.suffix),
+                ],
+                required: ["baseURL", "path"]
+            )
+        )
+    }
+
+    private struct CommonFilters {
+        let contentTypes: [ContentTypeFilter]
+        let entityTypes: [EntityFilter]
+        let sourceContexts: [SourceContextFilter]
+        let sourceBoosts: [String: Int]?
+        let minimumCharacterCount: Int?
+        let maximumCharacterCount: Int?
+    }
+
+    private static func parseCommonFilters(_ frontmatter: [String: String]) -> CommonFilters {
+        CommonFilters(
+            contentTypes: parseFilterArray(
+                frontmatter["content-types"] ?? frontmatter["metadata.copycopy-content-types"] ?? frontmatter["metadata.content_types"]
+            ) { ContentTypeFilter(rawValue: $0) },
+            entityTypes: parseFilterArray(
+                frontmatter["entity-types"] ?? frontmatter["metadata.copycopy-entity-types"] ?? frontmatter["metadata.entity_types"]
+            ) { EntityFilter(rawValue: $0) },
+            sourceContexts: parseFilterArray(
+                frontmatter["source-contexts"] ?? frontmatter["metadata.copycopy-source-contexts"] ?? frontmatter["metadata.source_contexts"]
+            ) { SourceContextFilter(rawValue: $0) },
+            sourceBoosts: {
+                let boosts = parseNestedSourceBoosts(frontmatter)
+                return boosts.isEmpty ? nil : boosts
+            }(),
+            minimumCharacterCount: (frontmatter["minimum-chars"] ?? frontmatter["minimum_characters"]).flatMap(Int.init),
+            maximumCharacterCount: (frontmatter["maximum-chars"] ?? frontmatter["maximum_characters"]).flatMap(Int.init)
+        )
     }
 
     private static func parseNestedSourceBoosts(_ frontmatter: [String: String]) -> [String: Int] {
@@ -838,6 +1097,22 @@ enum SkillParser {
 
     private static func extractPlaceholder(from template: String) throws -> PlaceholderMatch {
         let placeholders: [(token: String, source: String)] = [
+            // New body-based format: {sourceName} maps directly
+            ("{clipboard}", "clipboard"),
+            ("{clipboardURL}", "clipboardURL"),
+            ("{clipboardHTML}", "clipboardHTML"),
+            ("{clipboardLLM}", "clipboardLLM"),
+            ("{clipboardChatCleaned}", "clipboardChatCleaned"),
+            ("{clipboardClean}", "clipboardClean"),
+            ("{clipboardTrimmed}", "clipboardTrimmed"),
+            ("{clipboardUppercase}", "clipboardUppercase"),
+            ("{clipboardLowercase}", "clipboardLowercase"),
+            ("{clipboardTitleCase}", "clipboardTitleCase"),
+            ("{clipboardSentenceCase}", "clipboardSentenceCase"),
+            ("{filePaths}", "filePaths"),
+            ("{charCount}", "charCount"),
+            ("{lineCount}", "lineCount"),
+            // Legacy format: {text:modifier} style
             ("{text:clean}", "clipboardClean"),
             ("{text:uppercase}", "clipboardUppercase"),
             ("{text:lowercase}", "clipboardLowercase"),
