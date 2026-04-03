@@ -71,12 +71,10 @@ enum ChatTemplate: Equatable, Hashable {
 
     func format(systemPrompt: String, userPrompt: String) -> String {
         switch self {
-        case .lfm:
-            return "<|system|>\n\(systemPrompt)<|endoftext|>\n<|user|>\n\(userPrompt)<|endoftext|>\n<|assistant|>\n"
+        case .lfm, .chatml:
+            return "<|im_start|>system\n\(systemPrompt)<|im_end|>\n<|im_start|>user\n\(userPrompt)<|im_end|>\n<|im_start|>assistant\n"
         case .gemma:
             return "<start_of_turn>user\n\(systemPrompt)\n\n\(userPrompt)<end_of_turn>\n<start_of_turn>model\n"
-        case .chatml:
-            return "<|im_start|>system\n\(systemPrompt)<|im_end|>\n<|im_start|>user\n\(userPrompt)<|im_end|>\n<|im_start|>assistant\n"
         }
     }
 }
