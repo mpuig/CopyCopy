@@ -79,7 +79,7 @@ enum ChatTemplate: Equatable, Hashable {
         case .lfm, .chatml:
             return "<|im_start|>system\n\(systemPrompt)<|im_end|>\n<|im_start|>user\n\(userPrompt)<|im_end|>\n<|im_start|>assistant\n"
         case .gemma:
-            return "<|turn>system\n\(systemPrompt)<turn|>\n<|turn>user\n\(userPrompt)<turn|>\n<|turn>model\n"
+            return "<|turn>system\n\(systemPrompt)<turn|>\n<|turn>user\n\(userPrompt)<turn|>\n<|turn>model\n<|channel>thought\n<channel|>"
         }
     }
 }
