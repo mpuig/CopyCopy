@@ -175,7 +175,20 @@ final class LocalLLMService: ObservableObject {
 
         return try await generate(
             prompt: truncatedText,
-            systemPrompt: "Summarize into 3-5 bullet points. Keep the main point and key details. Cut filler and repetition. If very short, use one sentence. No headings or commentary.",
+            systemPrompt: """
+            You are a summarization assistant. Your task:
+            1. Read the text carefully
+            2. Identify the main point and 2-4 supporting details
+            3. Write a concise summary as bullet points
+
+            Rules:
+            - Use 3-5 short bullet points (one line each)
+            - Start each bullet with "- "
+            - Include only facts from the text, never invent
+            - If the text is very short (under 50 words), write one sentence instead
+            - No headings, no commentary, no introduction
+            - Output only the summary
+            """,
             temperature: 0.3,
             maxTokens: 500,
             onToken: onToken

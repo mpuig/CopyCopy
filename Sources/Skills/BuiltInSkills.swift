@@ -16,6 +16,8 @@ enum BuiltInSkills {
         ("explain-code", explainCode),
         ("extract-data", extractData),
         ("open-in-maps", openInMaps),
+        ("open-file", openFile),
+        ("reveal-in-finder", revealInFinder),
         ("reveal-path", revealPath),
         ("open-terminal", openTerminal),
     ]
@@ -35,7 +37,7 @@ openURL({clipboardURL})
 
     static let searchWeb = """
 ---
-name: Search the Web
+name: Search
 description: Search DuckDuckGo
 icon: magnifyingglass
 content-types: text
@@ -53,7 +55,7 @@ openURL(https://duckduckgo.com/?q={clipboard})
     static let cleanText = """
 ---
 name: Clean Text
-description: Strip formatting artifacts and normalize whitespace
+description: Remove formatting junk and fix whitespace
 icon: sparkles
 content-types: text
 source-boosts:
@@ -67,8 +69,8 @@ copyToClipboard({clipboardClean})
 
     static let htmlToMarkdown = """
 ---
-name: HTML to Markdown
-description: Convert rich HTML to clean Markdown
+name: Convert to Markdown
+description: Convert HTML to Markdown
 icon: arrow.down.doc.text
 content-types: text
 entity-types: html
@@ -97,12 +99,19 @@ source-boosts:
   other: 50
 ---
 
-Fix grammar, spelling, and punctuation. Preserve meaning and tone. Return only the corrected text.
+You are a proofreader. Fix errors in the text below.
+
+Rules:
+- Fix grammar, spelling, and punctuation errors
+- Preserve the original meaning, tone, and style
+- Do not rewrite sentences that are already correct
+- Do not add or remove content
+- Output only the corrected text, nothing else
 """
 
     static let makeConcise = """
 ---
-name: Make Concise
+name: Shorten
 description: Rewrite shorter and clearer
 icon: scissors
 content-types: text
@@ -114,7 +123,14 @@ source-boosts:
   other: 35
 ---
 
-Rewrite shorter and clearer. Cut filler and repetition. Keep all key facts. Return only the rewrite.
+You are an editor. Rewrite the text below to be shorter and clearer.
+
+Rules:
+- Cut filler words, repetition, and unnecessary detail
+- Keep all key facts, names, dates, and commitments
+- Preserve the original tone (formal stays formal, casual stays casual)
+- Aim for 30-50% shorter than the original
+- Output only the rewritten text, nothing else
 """
 
     static let summarize = """
@@ -138,7 +154,7 @@ Summarize into key points
 
     static let translate = """
 ---
-name: Translate to English
+name: Translate
 description: Translate foreign text to English
 icon: globe
 content-types: text
@@ -149,7 +165,13 @@ source-boosts:
   other: 25
 ---
 
-Translate to English. Return only the translation.
+You are a translator. Translate the text below to English.
+
+Rules:
+- Translate accurately, preserving meaning and tone
+- Keep proper nouns, brand names, and technical terms unchanged
+- If the text is already in English, return it unchanged
+- Output only the English translation, nothing else
 """
 
     // MARK: - AI Contextual
@@ -167,7 +189,14 @@ source-boosts:
   chat: 150
 ---
 
-Reply to the last message. Use earlier messages as context only. Be concise and conversational. Return only the reply.
+You are drafting a chat reply. The text below is a conversation.
+
+Rules:
+- Reply ONLY to the last message in the conversation
+- Use earlier messages as context, do not address them directly
+- Be concise, natural, and conversational
+- Match the tone of the conversation (casual if casual, professional if professional)
+- Output only the reply text, nothing else (no greetings, no signatures)
 """
 
     static let rewriteEmail = """
@@ -182,12 +211,19 @@ source-boosts:
   email: 120
 ---
 
-Rewrite as a polished email. Keep intent, facts, and commitments. Fix clarity, grammar, and tone. Return only the email body.
+You are an email editor. Rewrite the text below as a polished email.
+
+Rules:
+- Preserve the original intent, key facts, and commitments
+- Improve clarity, grammar, and professional tone
+- Keep it concise — no unnecessary padding or formality
+- Do not add a subject line
+- Output only the email body, nothing else
 """
 
     static let extractActionItems = """
 ---
-name: Extract Action Items
+name: Action Items
 description: Extract action items and next steps
 icon: checklist
 content-types: text
@@ -199,7 +235,14 @@ source-boosts:
   notes: 80
 ---
 
-List action items as bullets. Include owners and deadlines if mentioned. Only include items explicitly in the text. If none, say "No action items."
+You are extracting action items from the text below.
+
+Rules:
+- List each action item as a bullet point starting with "- "
+- Include the owner (who) and deadline (when) if mentioned
+- Only include items EXPLICITLY stated in the text — never invent
+- If no action items exist, output only: "No action items found."
+- Output only the bullet list, nothing else
 """
 
     static let explainCode = """
@@ -215,7 +258,14 @@ source-boosts:
   terminal: 50
 ---
 
-Explain this code. Key logic, inputs/outputs, risks. Bullet points.
+You are a code explainer. Explain the code below.
+
+Rules:
+- Describe what the code does in plain language
+- List key logic, inputs, outputs, and any risks
+- Use short bullet points
+- Do not rewrite or modify the code
+- Output only the explanation, nothing else
 """
 
     static let extractData = """
@@ -234,16 +284,15 @@ source-boosts:
   notes: 50
 ---
 
-Extract ONLY data that is explicitly present in the text. Group by type:
-- Emails
-- URLs
-- Phone numbers
-- Dates
-- Names
-- Amounts
+You are a data extractor. Find structured data in the text below.
 
-Skip types with zero matches. Do NOT invent or guess any data.
-If you find data, use copyToClipboard to copy the list.
+Rules:
+- Extract ONLY data explicitly present in the text
+- Group by type: Emails, URLs, Phone numbers, Dates, Names, Amounts
+- Skip types with zero matches
+- NEVER invent, guess, or hallucinate data
+- Use copyToClipboard to copy the extracted list
+- Output only the grouped list, nothing else
 """
 
     // MARK: - Places
@@ -260,13 +309,37 @@ entity-types: placeName, address, coordinates
 openURL(maps://?q={clipboard})
 """
 
-    // MARK: - Filesystem
+    // MARK: - Files & Directories
+
+    static let openFile = """
+---
+name: Open File
+description: Open with default app
+icon: doc
+content-types: files
+---
+
+openFile()
+"""
+
+    static let revealInFinder = """
+---
+name: Reveal in Finder
+description: Show in Finder
+icon: folder
+content-types: files
+---
+
+revealInFinder()
+"""
+
+    // MARK: - Filesystem (text paths)
 
     static let revealPath = """
 ---
-name: Reveal in Finder
-description: Show file path in Finder
-icon: folder
+name: Reveal Path
+description: Show path in Finder
+icon: folder.badge.questionmark
 content-types: text
 entity-types: filePath
 ---
