@@ -310,8 +310,8 @@ final class SkillParserTests: XCTestCase {
     func testBuiltInExtractDataSkill() throws {
         let skill = try SkillParser.parse(id: "extract-data", content: BuiltInSkills.extractData, isBuiltIn: true)
 
-        XCTAssertEqual(skill.executeFunction, .llmAgent)
-        XCTAssertTrue(skill.tools.contains("copyToClipboard"))
+        XCTAssertEqual(skill.executeFunction, .llmPrompt)
+        XCTAssertTrue(skill.tools.isEmpty)
     }
 
     // MARK: - Agent Skills (LLM with tools)
@@ -387,9 +387,22 @@ final class SkillParserTests: XCTestCase {
     }
 
     func testRoundTripAgentSkill() throws {
-        let skill = try SkillParser.parse(id: "extract-data", content: BuiltInSkills.extractData, isBuiltIn: true)
+        let content = """
+        ---
+        name: Smart Helper
+        description: Analyze and act
+        icon: wand.and.stars
+        content-types: text
+        text-source: clipboardLLM
+        tools: formatJSON, copyToClipboard
+        ---
+
+        Analyze the text and pick the best action.
+        """
+
+        let skill = try SkillParser.parse(id: "smart", content: content, isBuiltIn: true)
         let exported = SkillMarkdownFormatter.formatFlat(skill: skill)
-        let reparsed = try SkillParser.parse(id: "extract-data", content: exported, isBuiltIn: false)
+        let reparsed = try SkillParser.parse(id: "smart", content: exported, isBuiltIn: false)
 
         XCTAssertEqual(reparsed.executeFunction, .llmAgent)
         XCTAssertEqual(reparsed.tools, skill.tools)

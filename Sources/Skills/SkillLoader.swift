@@ -182,8 +182,9 @@ final class SkillLoader {
         context: ClipboardContext,
         executor: ToolExecutor
     ) -> SuggestedAction {
-        let subtitle = skill.executeFunction?.displayName
+        let subtitle = buildMatchReason(skill: skill, context: context)
         return SuggestedAction(
+            skillId: skill.id,
             title: skill.description,
             subtitle: subtitle,
             systemImage: skill.icon
@@ -198,6 +199,31 @@ final class SkillLoader {
         }
     }
 
+    private func buildMatchReason(skill: Skill, context: ClipboardContext) -> String {
+        var parts: [String] = []
+
+        let matchedEntity = skill.entityTypes.first { $0.matchesAny(context.snapshot.detectedEntities) }
+        if let entity = matchedEntity {
+            parts.append(entity.displayName)
+        }
+
+        let source = context.sourceAppContext
+        if !skill.sourceContexts.isEmpty || (skill.parsedSourceBoosts[source] ?? 0) > 0 {
+            parts.append(source.displayName)
+        }
+
+        let count = UsageHistory.shared.count(
+            for: skill.id,
+            contentKind: context.snapshot.kind,
+            sourceContext: source
+        )
+        if count > 0 {
+            parts.append("used \(count)×")
+        }
+
+        return parts.joined(separator: " · ")
+    }
+
     private func relevanceScore(
         for skill: Skill,
         context: ClipboardContext,
@@ -206,6 +232,11 @@ final class SkillLoader {
         let textLength = context.snapshot.plainText?.count ?? 0
         let sourceBoost = skill.parsedSourceBoosts[sourceContext] ?? 0
         let entityBoost = skill.entityTypes.isEmpty ? 0 : 40
+        let historyBoost = UsageHistory.shared.boost(
+            for: skill.id,
+            contentKind: context.snapshot.kind,
+            sourceContext: sourceContext
+        )
 
         let lengthBoost: Int
         if let min = skill.minimumCharacterCount, textLength >= min {
@@ -225,7 +256,7 @@ final class SkillLoader {
             lengthPenalty = 0
         }
 
-        return sourceBoost + entityBoost + lengthBoost + lengthPenalty
+        return sourceBoost + entityBoost + lengthBoost + lengthPenalty + historyBoost
     }
 
     // MARK: - Custom Skills

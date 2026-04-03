@@ -265,6 +265,12 @@ class FloatingPanelViewModel: ObservableObject {
         executedAction = action
         processingState = .processing("Running \(action.title)…")
 
+        UsageHistory.shared.record(
+            skillId: action.skillId,
+            contentKind: context.snapshot.kind,
+            sourceContext: context.sourceAppContext
+        )
+
         onActionStarted?()
 
         Task { @MainActor [weak self] in
@@ -497,9 +503,16 @@ struct ActionRow: View {
                 .foregroundStyle(isSelected ? .white : .secondary)
                 .frame(width: 20, alignment: .center)
 
-            Text(action.title)
-                .font(.body)
-                .foregroundStyle(isSelected ? .white : .primary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(action.title)
+                    .font(.body)
+                    .foregroundStyle(isSelected ? .white : .primary)
+                if let subtitle = action.subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(isSelected ? Color.white.opacity(0.7) : Color.secondary.opacity(0.6))
+                }
+            }
 
             Spacer()
 

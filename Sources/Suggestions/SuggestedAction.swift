@@ -5,6 +5,7 @@ struct SuggestedAction: Identifiable {
     typealias StreamCallback = (_ token: String) -> Void
 
     let id = UUID()
+    let skillId: String
     let title: String
     let subtitle: String?
     let systemImage: String
