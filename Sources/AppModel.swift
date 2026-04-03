@@ -91,7 +91,7 @@ final class AppModel: ObservableObject {
         startEventTapIfPossible()
         
         // Preload local LLM model if enabled
-        if settings.llmEnabled && settings.useLocalLLM {
+        if settings.llmEnabled {
             Task {
                 await LocalLLMService.shared.loadModel()
             }
@@ -230,7 +230,7 @@ final class AppModel: ObservableObject {
     }
 
     private func scheduleSemanticClassificationIfNeeded(for context: ClipboardContext) {
-        guard settings.llmEnabled, settings.useLocalLLM, LocalLLMService.shared.isReady else { return }
+        guard settings.llmEnabled, LocalLLMService.shared.isReady else { return }
         guard context.snapshot.kind == .plainText, let text = context.snapshot.plainText else { return }
         guard shouldRunSemanticClassification(for: text, entities: context.snapshot.detectedEntities) else { return }
 

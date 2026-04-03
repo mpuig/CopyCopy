@@ -29,18 +29,6 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    @Published var useLocalLLM: Bool {
-        didSet {
-            UserDefaults.standard.set(useLocalLLM, forKey: "useLocalLLM")
-        }
-    }
-
-    @Published var llmApiKey: String {
-        didSet {
-            UserDefaults.standard.set(llmApiKey, forKey: "llmApiKey")
-        }
-    }
-
     @Published var llmModel: String {
         didSet {
             UserDefaults.standard.set(llmModel, forKey: "llmModel")
@@ -55,8 +43,6 @@ final class AppSettings: ObservableObject {
         self.doubleCopyThresholdMs = stored > 0 ? stored : 280
 
         self.llmEnabled = UserDefaults.standard.object(forKey: "llmEnabled") as? Bool ?? true
-        self.useLocalLLM = UserDefaults.standard.object(forKey: "useLocalLLM") as? Bool ?? true
-        self.llmApiKey = UserDefaults.standard.string(forKey: "llmApiKey") ?? ""
         self.llmModel = UserDefaults.standard.string(forKey: "llmModel") ?? ModelDefinition.defaultId
 
         syncLaunchAtLoginState()

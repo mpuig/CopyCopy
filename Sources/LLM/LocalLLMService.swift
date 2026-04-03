@@ -82,25 +82,8 @@ final class LocalLLMService: ObservableObject {
         downloadingModels[definition.id] = 0
 
         do {
-            let cacheDir = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".cache/copycopy/models")
-            try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
-
-            let localPath = cacheDir.appendingPathComponent(definition.filename)
-            let modelId = definition.id
-
-            let delegate = DownloadDelegate { [weak self] progress in
-                Task { @MainActor in
-                    self?.downloadingModels[modelId] = progress
-                }
-            }
-            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
-
-            let (tempURL, _) = try await session.download(from: definition.downloadURL)
-            session.finishTasksAndInvalidate()
-
-            try FileManager.default.moveItem(at: tempURL, to: localPath)
-            Logger.info("Downloaded model: \(definition.name)", category: .general)
+            let localPath = try await downloadGGUF(definition: definition)
+            Logger.info("Downloaded model: \(definition.name) → \(localPath.path)", category: .general)
         } catch {
             Logger.error("Failed to download \(definition.name): \(error)", category: .general)
         }
@@ -113,29 +96,48 @@ final class LocalLLMService: ObservableObject {
             return definition.localPath
         }
 
+        loadingProgress = "Downloading \(definition.name)..."
+        downloadingModels[definition.id] = 0
+
+        let localPath = try await downloadGGUF(definition: definition)
+        downloadingModels.removeValue(forKey: definition.id)
+        return localPath
+    }
+
+    private func downloadGGUF(definition: ModelDefinition) async throws -> URL {
         let cacheDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".cache/copycopy/models")
         try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
-        loadingProgress = "Downloading \(definition.name)..."
+        let localPath = cacheDir.appendingPathComponent(definition.filename)
         let modelId = definition.id
 
-        let delegate = DownloadDelegate { [weak self] progress in
-            Task { @MainActor in
-                self?.downloadProgress = progress
-                self?.downloadingModels[modelId] = progress
-                let percent = Int(progress * 100)
-                self?.loadingProgress = "Downloading: \(percent)%"
-            }
+        let tempURL: URL = try await withCheckedThrowingContinuation { continuation in
+            let delegate = DownloadDelegate(
+                onProgress: { [weak self] progress in
+                    Task { @MainActor in
+                        self?.downloadingModels[modelId] = progress
+                        self?.downloadProgress = progress
+                        let percent = Int(progress * 100)
+                        self?.loadingProgress = "Downloading: \(percent)%"
+                    }
+                },
+                onComplete: { url, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else if let url {
+                        continuation.resume(returning: url)
+                    } else {
+                        continuation.resume(throwing: LocalLLMError.modelNotLoaded)
+                    }
+                }
+            )
+
+            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+            session.downloadTask(with: definition.downloadURL).resume()
         }
-        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
 
-        let (tempURL, _) = try await session.download(from: definition.downloadURL)
-        session.finishTasksAndInvalidate()
-
-        let localPath = definition.localPath
         try FileManager.default.moveItem(at: tempURL, to: localPath)
-        downloadingModels.removeValue(forKey: modelId)
         return localPath
     }
 
@@ -399,12 +401,28 @@ actor LlamaContext {
 
 private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     let onProgress: (Double) -> Void
+    let onComplete: (URL?, Error?) -> Void
 
-    init(onProgress: @escaping (Double) -> Void) {
+    init(
+        onProgress: @escaping (Double) -> Void,
+        onComplete: @escaping (URL?, Error?) -> Void
+    ) {
         self.onProgress = onProgress
+        self.onComplete = onComplete
     }
 
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        // Copy to a temp location that won't be cleaned up when this method returns
+        let tempCopy = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".gguf")
+        try? FileManager.default.copyItem(at: location, to: tempCopy)
+        onComplete(tempCopy, nil)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error {
+            onComplete(nil, error)
+        }
+    }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         guard totalBytesExpectedToWrite > 0 else { return }

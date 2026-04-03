@@ -598,8 +598,8 @@ final class ToolExecutor {
     }
 
     private func ensureModelReady(onStatus: @escaping StatusCallback) async {
-        let useLocal = await MainActor.run { UserDefaults.standard.bool(forKey: "useLocalLLM") }
-        guard useLocal else { return }
+        let enabled = await MainActor.run { UserDefaults.standard.bool(forKey: "llmEnabled") }
+        guard enabled else { return }
         let isReady = await LocalLLMService.shared.isReady
         if !isReady {
             await MainActor.run { onStatus("Loading model…") }
