@@ -1,33 +1,49 @@
 import Cocoa
+import os
 
 @MainActor
 final class ToolExecutor {
     typealias ActionCompletion = (_ text: String, _ isInClipboard: Bool) -> Void
 
     private let reservedURLKeys: Set<String> = ["baseURL", "path", "fragment"]
+    private let internalParameterPrefix = "__copycopy_"
+    private let timestampRegex = try! NSRegularExpression(
+        pattern: #"\b\d{1,2}:\d{2}\s*(AM|PM)\b"#,
+        options: [.caseInsensitive]
+    )
 
+    typealias StreamCallback = (_ token: String) -> Void
+    typealias StatusCallback = (_ status: String) -> Void
+
+    @discardableResult
     func execute(
-        tool: ToolDefinition,
+        skill: Skill,
         context: ClipboardContext,
-        completion: @escaping ActionCompletion
-    ) {
+        completion: @escaping ActionCompletion,
+        onToken: @escaping StreamCallback = { _ in },
+        onStatus: @escaping StatusCallback = { _ in }
+    ) -> (() -> Void)? {
         do {
-            let function = try ToolValidator.validateExecuteFunction(tool.execute)
-            try ToolValidator.validateJSONObjectParameters(tool.parameters)
-            let parameters = try resolveParameters(tool.parameters, context: context)
-            execute(function: function, parameters: parameters, context: context, completion: completion)
+            let function = try ToolValidator.validateExecuteFunction(skill.execute)
+            try ToolValidator.validateJSONObjectParameters(skill.parameters)
+            let parameters = try resolveParameters(skill.parameters, context: context)
+            return execute(function: function, parameters: parameters, context: context, completion: completion, onToken: onToken, onStatus: onStatus)
         } catch {
-            Logger.error("Tool execution failed for '\(tool.id)': \(error)", category: .actions)
+            Logger.error("Tool execution failed for '\(skill.id)': \(error)", category: .actions)
             completion("Failed: \(error.localizedDescription)", false)
+            return nil
         }
     }
 
+    @discardableResult
     private func execute(
         function: ExecuteFunction,
         parameters: [String: String],
         context: ClipboardContext,
-        completion: @escaping ActionCompletion
-    ) {
+        completion: @escaping ActionCompletion,
+        onToken: @escaping StreamCallback = { _ in },
+        onStatus: @escaping StatusCallback = { _ in }
+    ) -> (() -> Void)? {
         do {
             switch function {
             case .openURL:
@@ -68,7 +84,7 @@ final class ToolExecutor {
             case .copyToClipboard:
                 let text = try requiredText(parameters["text"] ?? primaryText(from: context))
                 copyToClipboard(text)
-                completion("Copied to clipboard", true)
+                completion(text, true)
 
             case .formatJSON:
                 let json = try requiredText(parameters["json"] ?? primaryText(from: context))
@@ -97,7 +113,7 @@ final class ToolExecutor {
                 completion(stripped, true)
 
             case .htmlToMarkdown:
-                let html = try requiredText(parameters["html"] ?? primaryText(from: context))
+                let html = try requiredText(parameters["html"] ?? primaryHTML(from: context) ?? primaryText(from: context))
                 executeHTMLToMarkdown(html, completion: completion)
 
             case .revealPath:
@@ -120,11 +136,26 @@ final class ToolExecutor {
             case .llmPrompt:
                 let prompt = try requiredText(parameters["prompt"] ?? primaryText(from: context))
                 let systemPrompt = parameters["systemPrompt"] ?? "You are a helpful assistant."
-                executeLLMPrompt(prompt: prompt, systemPrompt: systemPrompt, completion: completion)
+                return executeLLMPrompt(
+                    prompt: prompt,
+                    systemPrompt: systemPrompt,
+                    promptSource: sourceMetadata(named: "prompt", parameters: parameters),
+                    context: context,
+                    completion: completion,
+                    onToken: onToken,
+                    onStatus: onStatus
+                )
 
             case .summarize:
                 let text = try requiredText(parameters["text"] ?? primaryText(from: context))
-                executeSummarize(text: text, completion: completion)
+                return executeSummarize(
+                    text: text,
+                    textSource: sourceMetadata(named: "text", parameters: parameters),
+                    context: context,
+                    completion: completion,
+                    onToken: onToken,
+                    onStatus: onStatus
+                )
 
             case .openStaticURL:
                 guard let urlString = parameters["url"] else {
@@ -134,9 +165,11 @@ final class ToolExecutor {
                 NSWorkspace.shared.open(url)
                 completion("Opened URL", false)
             }
+            return nil
         } catch {
             Logger.error("Tool function \(function.rawValue) failed: \(error)", category: .actions)
             completion("Failed: \(error.localizedDescription)", false)
+            return nil
         }
     }
 
@@ -149,6 +182,9 @@ final class ToolExecutor {
         for (name, property) in parameters.properties {
             if let value = try resolveProperty(named: name, property: property, context: context) {
                 resolved[name] = value
+                if let source = property.source {
+                    resolved[sourceMetadataKey(for: name)] = source
+                }
             }
         }
 
@@ -171,6 +207,22 @@ final class ToolExecutor {
             rawValue = property.value
         case "clipboard":
             rawValue = primaryText(from: context)
+        case "clipboardLLM":
+            rawValue = bestLLMText(from: context)
+        case "clipboardChatCleaned":
+            rawValue = primaryText(from: context) ?? bestLLMText(from: context)
+        case "clipboardClean":
+            rawValue = primaryText(from: context).map(cleanText)
+        case "clipboardUppercase":
+            rawValue = primaryText(from: context).map { $0.uppercased() }
+        case "clipboardLowercase":
+            rawValue = primaryText(from: context).map { $0.lowercased() }
+        case "clipboardTitleCase":
+            rawValue = primaryText(from: context).map { $0.capitalized }
+        case "clipboardSentenceCase":
+            rawValue = primaryText(from: context).map(sentenceCase)
+        case "clipboardHTML":
+            rawValue = primaryHTML(from: context) ?? primaryText(from: context)
         case "clipboardURL":
             rawValue = context.snapshot.url?.absoluteString ?? primaryText(from: context)
         case "filePaths":
@@ -206,7 +258,7 @@ final class ToolExecutor {
         let path = parameters["path"]
         let fragment = parameters["fragment"]
         let queryItems = parameters
-            .filter { !reservedURLKeys.contains($0.key) }
+            .filter { !reservedURLKeys.contains($0.key) && !$0.key.hasPrefix(internalParameterPrefix) }
             .sorted { $0.key < $1.key }
             .map { URLQueryItem(name: $0.key, value: $0.value) }
 
@@ -324,38 +376,88 @@ final class ToolExecutor {
     private func executeLLMPrompt(
         prompt: String,
         systemPrompt: String,
-        completion: @escaping ActionCompletion
-    ) {
-        Task {
+        promptSource: String?,
+        context: ClipboardContext,
+        completion: @escaping ActionCompletion,
+        onToken: @escaping StreamCallback,
+        onStatus: @escaping StatusCallback
+    ) -> (() -> Void)? {
+        let task = Task.detached { [weak self] in
+            guard let self else { return }
             do {
-                let result = try await LocalLLMService.shared.generate(
-                    prompt: truncate(prompt),
-                    systemPrompt: systemPrompt,
-                    temperature: 0.3,
-                    maxTokens: 800
-                )
-                copyToClipboard(result)
-                completion(result, true)
+                await self.ensureModelReady(onStatus: onStatus)
+                let preparedPrompt = try await self.preparePromptForLLM(prompt, source: promptSource, context: context)
+                let result = try await self.withLLMTimeout {
+                    try await LocalLLMService.shared.generate(
+                        prompt: self.truncate(preparedPrompt),
+                        systemPrompt: systemPrompt,
+                        temperature: 0.3,
+                        maxTokens: 800,
+                        onToken: { token in
+                            Task { @MainActor in onToken(token) }
+                        }
+                    )
+                }
+                await MainActor.run {
+                    self.copyToClipboard(result)
+                    completion(result, true)
+                }
+            } catch is CancellationError {
+                // Partial result already streamed via onToken
             } catch {
-                completion("Failed: \(error.localizedDescription)", false)
+                await MainActor.run {
+                    completion("Failed: \(error.localizedDescription)", false)
+                }
             }
         }
+        return { task.cancel() }
     }
 
     private func executeSummarize(
         text: String,
-        completion: @escaping ActionCompletion
-    ) {
-        let content = text.contains("<") && text.contains(">") ? SimpleHtmlConverter.toMarkdown(text) : text
-
-        Task {
+        textSource: String?,
+        context: ClipboardContext,
+        completion: @escaping ActionCompletion,
+        onToken: @escaping StreamCallback,
+        onStatus: @escaping StatusCallback
+    ) -> (() -> Void)? {
+        let task = Task.detached { [weak self] in
+            guard let self else { return }
             do {
-                let result = try await LLMService.shared.summarizeText(truncate(content))
-                copyToClipboard(result)
-                completion(result, true)
+                await self.ensureModelReady(onStatus: onStatus)
+                let preparedText = try await self.preparePromptForLLM(text, source: textSource, context: context)
+                let content = (textSource == "clipboardHTML")
+                    ? HTMLMarkdownConverter.plainText(preparedText)
+                    : preparedText
+                let result = try await self.withLLMTimeout {
+                    try await LLMService.shared.summarizeText(
+                        self.truncate(content),
+                        onToken: { token in
+                            Task { @MainActor in onToken(token) }
+                        }
+                    )
+                }
+                await MainActor.run {
+                    self.copyToClipboard(result)
+                    completion(result, true)
+                }
+            } catch is CancellationError {
+                // Partial result already streamed via onToken
             } catch {
-                completion("Failed: \(error.localizedDescription)", false)
+                await MainActor.run {
+                    completion("Failed: \(error.localizedDescription)", false)
+                }
             }
+        }
+        return { task.cancel() }
+    }
+
+    private func ensureModelReady(onStatus: @escaping StatusCallback) async {
+        let useLocal = await MainActor.run { UserDefaults.standard.bool(forKey: "useLocalLLM") }
+        guard useLocal else { return }
+        let isReady = await LocalLLMService.shared.isReady
+        if !isReady {
+            await MainActor.run { onStatus("Loading model…") }
         }
     }
 
@@ -364,43 +466,107 @@ final class ToolExecutor {
         completion: @escaping ActionCompletion
     ) {
         Task.detached {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["pandoc", "-f", "html", "-t", "markdown", "--wrap=none"]
-
-            let inputPipe = Pipe()
-            let outputPipe = Pipe()
-            process.standardInput = inputPipe
-            process.standardOutput = outputPipe
-            process.standardError = outputPipe
-
             do {
-                try process.run()
-                if let data = html.data(using: .utf8) {
-                    inputPipe.fileHandleForWriting.write(data)
-                }
-                inputPipe.fileHandleForWriting.closeFile()
-                process.waitUntilExit()
-
-                if process.terminationStatus == 0 {
-                    let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
-                    if let markdown = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                       !markdown.isEmpty {
-                        await MainActor.run {
-                            self.copyToClipboard(markdown)
-                            completion(markdown, true)
-                        }
-                        return
-                    }
+                let markdown = try await HTMLMarkdownConverter.convertAsync(html)
+                await MainActor.run {
+                    self.copyToClipboard(markdown)
+                    completion(markdown, true)
                 }
             } catch {
-                Logger.debug("Pandoc unavailable for htmlToMarkdown: \(error)", category: .actions)
+                Logger.error("HTML to Markdown conversion failed: \(error)", category: .actions)
+                await MainActor.run {
+                    completion("Failed: \(error.localizedDescription)", false)
+                }
+            }
+        }
+    }
+
+    private func preparePromptForLLM(
+        _ prompt: String,
+        source: String?,
+        context: ClipboardContext
+    ) async throws -> String {
+        guard source == "clipboardChatCleaned", context.sourceAppContext == .chat else {
+            return prompt
+        }
+
+        let deterministic = ClipboardTextPreprocessor.sanitizeForLLM(prompt)
+
+        do {
+            let cleaned = try await LocalLLMService.shared.cleanChatTranscript(prompt)
+            let trimmed = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+            if isPlausibleChatCleanup(trimmed, comparedTo: deterministic, raw: prompt) {
+                return trimmed
+            }
+        } catch {
+            Logger.warning("Chat cleanup fallback triggered: \(error)", category: .actions)
+        }
+
+        return deterministic.isEmpty ? prompt : deterministic
+    }
+
+    private func isPlausibleChatCleanup(
+        _ cleaned: String,
+        comparedTo fallback: String,
+        raw: String
+    ) -> Bool {
+        guard !cleaned.isEmpty else { return false }
+
+        let cleanedWords = wordCount(in: cleaned)
+        let fallbackWords = wordCount(in: fallback)
+        let rawWords = wordCount(in: raw)
+        let cleanedTimestamps = matchCount(timestampRegex, in: cleaned)
+        let rawTimestamps = matchCount(timestampRegex, in: raw)
+
+        if cleanedWords < 6 {
+            return false
+        }
+
+        if rawWords >= 40 && cleanedWords < max(10, rawWords / 8) {
+            return false
+        }
+
+        if fallbackWords >= 20 && cleanedWords < max(8, fallbackWords / 3) {
+            return false
+        }
+
+        if rawTimestamps >= 2 && cleanedTimestamps == 0 {
+            return false
+        }
+
+        return true
+    }
+
+    nonisolated private func withLLMTimeout<T: Sendable>(
+        seconds: TimeInterval = 25,
+        operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            let resumed = OSAllocatedUnfairLock(initialState: false)
+
+            let operationTask = Task.detached(priority: .userInitiated) {
+                try await operation()
             }
 
-            let markdown = SimpleHtmlConverter.toMarkdown(html)
-            await MainActor.run {
-                self.copyToClipboard(markdown)
-                completion(markdown, true)
+            Task.detached {
+                do {
+                    let result = try await operationTask.value
+                    if resumed.withLock({ v -> Bool in guard !v else { return false }; v = true; return true }) {
+                        continuation.resume(returning: result)
+                    }
+                } catch {
+                    if resumed.withLock({ v -> Bool in guard !v else { return false }; v = true; return true }) {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+
+            Task.detached {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                if resumed.withLock({ v -> Bool in guard !v else { return false }; v = true; return true }) {
+                    operationTask.cancel()
+                    continuation.resume(throwing: ToolExecutionError.llmTimeout)
+                }
             }
         }
     }
@@ -486,8 +652,111 @@ final class ToolExecutor {
         NSPasteboard.general.setString(text, forType: .string)
     }
 
+    private func primaryHTML(from context: ClipboardContext) -> String? {
+        context.snapshot.htmlText
+    }
+
     private func primaryText(from context: ClipboardContext) -> String? {
         context.snapshot.plainText ?? context.snapshot.url?.absoluteString
+    }
+
+    private func bestLLMText(from context: ClipboardContext) -> String? {
+        ClipboardTextPreprocessor.bestLLMInput(from: context.snapshot)
+            ?? primaryText(from: context)
+    }
+
+    private func sourceMetadataKey(for name: String) -> String {
+        "\(internalParameterPrefix)source_\(name)"
+    }
+
+    private func sourceMetadata(named name: String, parameters: [String: String]) -> String? {
+        parameters[sourceMetadataKey(for: name)]
+    }
+
+    private func wordCount(in text: String) -> Int {
+        text.split { $0.isWhitespace || $0.isNewline }.count
+    }
+
+    private func matchCount(_ regex: NSRegularExpression, in text: String) -> Int {
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.numberOfMatches(in: text, range: range)
+    }
+
+    private func cleanText(_ text: String) -> String {
+        var normalized = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+
+        let unicodeReplacements: [(String, String)] = [
+            ("\u{00A0}", " "),
+            ("\u{1680}", " "),
+            ("\u{2000}", " "),
+            ("\u{2001}", " "),
+            ("\u{2002}", " "),
+            ("\u{2003}", " "),
+            ("\u{2004}", " "),
+            ("\u{2005}", " "),
+            ("\u{2006}", " "),
+            ("\u{2007}", " "),
+            ("\u{2008}", " "),
+            ("\u{2009}", " "),
+            ("\u{200A}", " "),
+            ("\u{202F}", " "),
+            ("\u{205F}", " "),
+            ("\u{3000}", " "),
+            ("\u{200B}", ""),
+            ("\u{200C}", ""),
+            ("\u{200D}", ""),
+            ("\u{2060}", ""),
+            ("\u{FEFF}", ""),
+            ("\u{00AD}", "")
+        ]
+
+        for (from, to) in unicodeReplacements {
+            normalized = normalized.replacingOccurrences(of: from, with: to)
+        }
+
+        let lines = normalized.components(separatedBy: .newlines).map {
+            $0.replacingOccurrences(of: #"[ \t]+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        var cleaned: [String] = []
+        cleaned.reserveCapacity(lines.count)
+        for line in lines {
+            if line.isEmpty {
+                if cleaned.last?.isEmpty == false {
+                    cleaned.append("")
+                }
+            } else {
+                cleaned.append(line)
+            }
+        }
+
+        return cleaned.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func sentenceCase(_ text: String) -> String {
+        let cleaned = cleanText(text).lowercased()
+        guard !cleaned.isEmpty else { return cleaned }
+
+        var result = ""
+        var capitalizeNext = true
+
+        for character in cleaned {
+            if capitalizeNext, String(character).rangeOfCharacter(from: .letters) != nil {
+                result.append(String(character).uppercased())
+                capitalizeNext = false
+            } else {
+                result.append(character)
+            }
+
+            if ".!?".contains(character) {
+                capitalizeNext = true
+            }
+        }
+
+        return result
     }
 
     private func truncate(_ text: String, maxLength: Int = 3000) -> String {
@@ -534,6 +803,7 @@ enum ToolExecutionError: LocalizedError {
     case invalidBase64
     case nonUTF8Base64Payload
     case couldNotDecodeURL(String)
+    case llmTimeout
 
     var errorDescription: String? {
         switch self {
@@ -555,67 +825,8 @@ enum ToolExecutionError: LocalizedError {
             return "Decoded Base64 data is not UTF-8 text"
         case let .couldNotDecodeURL(value):
             return "Could not decode URL-encoded text '\(value)'"
+        case .llmTimeout:
+            return "The AI action took too long to finish"
         }
-    }
-}
-
-enum SimpleHtmlConverter {
-    static func toMarkdown(_ html: String) -> String {
-        var markdown = html
-
-        let removals: [(String, NSRegularExpression.Options)] = [
-            ("<script[^>]*>[\\s\\S]*?</script>", .caseInsensitive),
-            ("<style[^>]*>[\\s\\S]*?</style>", .caseInsensitive),
-        ]
-
-        for (pattern, options) in removals {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: options) {
-                markdown = regex.stringByReplacingMatches(
-                    in: markdown,
-                    range: NSRange(markdown.startIndex..., in: markdown),
-                    withTemplate: ""
-                )
-            }
-        }
-
-        let replacements: [(String, String)] = [
-            ("<strong[^>]*>([^<]*)</strong>", "**$1**"),
-            ("<b[^>]*>([^<]*)</b>", "**$1**"),
-            ("<em[^>]*>([^<]*)</em>", "*$1*"),
-            ("<i[^>]*>([^<]*)</i>", "*$1*"),
-            ("<a[^>]+href=\"([^\"]+)\"[^>]*>([^<]*)</a>", "[$2]($1)"),
-            ("<li[^>]*>([^<]*)</li>", "- $1"),
-            ("<p[^>]*>([^<]*)</p>", "\n\n$1\n\n"),
-            ("<br\\s*/?>", "\n"),
-        ]
-
-        for (pattern, replacement) in replacements {
-            markdown = markdown.replacingOccurrences(of: pattern, with: replacement, options: .regularExpression)
-        }
-
-        if let tagRegex = try? NSRegularExpression(pattern: "<[^>]+>") {
-            markdown = tagRegex.stringByReplacingMatches(
-                in: markdown,
-                range: NSRange(markdown.startIndex..., in: markdown),
-                withTemplate: ""
-            )
-        }
-
-        markdown = markdown.replacingOccurrences(of: "\n\\s*\n\\s*\n", with: "\n\n", options: .regularExpression)
-
-        let entities: [(String, String)] = [
-            ("&lt;", "<"),
-            ("&gt;", ">"),
-            ("&amp;", "&"),
-            ("&quot;", "\""),
-            ("&#39;", "'"),
-            ("&nbsp;", " "),
-        ]
-
-        for (entity, character) in entities {
-            markdown = markdown.replacingOccurrences(of: entity, with: character)
-        }
-
-        return markdown.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

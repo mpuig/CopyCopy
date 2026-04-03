@@ -23,6 +23,12 @@ final class LocalLLMService: ObservableObject {
     }
     
     private init() {}
+
+    func waitUntilReady() async {
+        while isLoading && !isReady {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+    }
     
     func loadModel() async {
         guard !isReady && !isLoading else { return }
@@ -74,57 +80,84 @@ final class LocalLLMService: ObservableObject {
         prompt: String,
         systemPrompt: String = "You are a helpful assistant.",
         temperature: Float = 0.3,
-        maxTokens: Int = 500
+        maxTokens: Int = 500,
+        onToken: (@Sendable (String) -> Void)? = nil
     ) async throws -> String {
         guard let container = modelContainer else {
             throw LocalLLMError.modelNotLoaded
         }
-        
+
         let messages: [Chat.Message] = [
             .system(systemPrompt),
             .user(prompt)
         ]
-        
+
         let userInput = UserInput(prompt: .chat(messages))
-        
+
         let parameters = GenerateParameters(
             maxTokens: maxTokens,
             temperature: temperature
         )
-        
-        // Use perform to get a context and generate
-        return try await container.perform { (context: ModelContext) async throws -> String in
-            // Process user input to get LMInput
-            let lmInput = try await context.processor.prepare(input: userInput)
-            
-            // Generate with streaming
-            let stream = try MLXLMCommon.generate(
-                input: lmInput,
+
+        return try await Task.detached(priority: .userInitiated) {
+            try await Self.runGeneration(
+                container: container,
+                userInput: userInput,
                 parameters: parameters,
-                context: context
+                onToken: onToken
             )
-            
-            var output = ""
-            for await generation in stream {
-                if let text = generation.chunk {
-                    output += text
-                }
-            }
-            
-            return output.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+        }.value
     }
     
-    func summarize(_ text: String) async throws -> String {
-        let truncatedText = text.count > 3000 
+    func summarize(
+        _ text: String,
+        onToken: (@Sendable (String) -> Void)? = nil
+    ) async throws -> String {
+        let truncatedText = text.count > 3000
             ? String(text.prefix(3000)) + "\n\n[Content truncated]"
             : text
 
         return try await generate(
             prompt: truncatedText,
-            systemPrompt: "Summarize the clipboard text into a short, clear summary. Preserve the main point and the most important supporting details. Omit repetition, filler, and minor examples. Use a neutral professional tone. Default to 3-5 bullet points. If the source is very short, return a single sentence. Do not add headings, commentary, or information not present in the source.",
+            systemPrompt: "Summarize into 3-5 bullet points. Keep the main point and key details. Cut filler and repetition. If very short, use one sentence. No headings or commentary.",
             temperature: 0.3,
-            maxTokens: 500
+            maxTokens: 500,
+            onToken: onToken
+        )
+    }
+
+    func cleanChatTranscript(_ text: String) async throws -> String {
+        let truncatedText = text.count > 5000
+            ? String(text.prefix(5000)) + "\n\n[Content truncated]"
+            : text
+
+        return try await generate(
+            prompt: truncatedText,
+            systemPrompt: """
+            Clean up the copied chat transcript.
+
+            Keep:
+            - all authors
+            - all timestamps
+            - all real message content
+
+            Remove:
+            - navigation UI
+            - search bars
+            - counts and badges
+            - composer and footer text
+            - buttons, labels, and app chrome
+            - decorative standalone tokens that are not part of a real message
+
+            Rules:
+            - Do not summarize.
+            - Do not rewrite.
+            - Do not omit any real message content.
+            - Preserve the original language.
+            - Return only the cleaned chat transcript as plain text.
+            """,
+            temperature: 0.0,
+            maxTokens: 1200
         )
     }
 
@@ -188,11 +221,50 @@ final class LocalLLMService: ObservableObject {
 
         return String(text[start...end])
     }
+
+    private nonisolated static func runGeneration(
+        container: ModelContainer,
+        userInput: UserInput,
+        parameters: GenerateParameters,
+        onToken: (@Sendable (String) -> Void)? = nil
+    ) async throws -> String {
+        try await container.perform { (context: ModelContext) async throws -> String in
+            let lmInput = try await context.processor.prepare(input: userInput)
+
+            let stream = try MLXLMCommon.generate(
+                input: lmInput,
+                parameters: parameters,
+                context: context
+            )
+
+            var output = ""
+            for await generation in stream {
+                if Task.isCancelled { break }
+                if let text = generation.chunk {
+                    output += text
+                    onToken?(text)
+                }
+            }
+
+            return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
     
 }
 
-enum LocalLLMError: Error {
+enum LocalLLMError: Error, LocalizedError {
     case modelNotLoaded
     case generationFailed(Error)
     case invalidResponse
+
+    var errorDescription: String? {
+        switch self {
+        case .modelNotLoaded:
+            return "The AI model is not loaded"
+        case .generationFailed(let error):
+            return "AI generation failed: \(error.localizedDescription)"
+        case .invalidResponse:
+            return "The AI model returned an invalid response"
+        }
+    }
 }

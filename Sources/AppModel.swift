@@ -166,13 +166,25 @@ final class AppModel: ObservableObject {
                 return
             }
             Logger.info("[AppModel] Showing floating panel", category: .clipboard)
-            
-            // Close any existing panel
+
+            // If a panel is already showing an executed action, just dismiss it
+            if let existing = self.floatingPanel, existing.isVisible {
+                existing.close()
+                self.floatingPanel = nil
+                return
+            }
+
             self.floatingPanel?.close()
-            
-            // Create and show the floating panel
+
             if let context = self.lastClipboardContext {
-                let panel = FloatingActionPanel(context: context, actions: self.suggestedActions)
+                let panel = FloatingActionPanel(
+                    context: context,
+                    actions: self.suggestedActions,
+                    onActionStarted: { [weak self] in
+                        self?.semanticClassificationTask?.cancel()
+                        self?.semanticClassificationTask = nil
+                    }
+                )
                 self.floatingPanel = panel
                 panel.show()
             }

@@ -6,27 +6,30 @@ import Combine
 class FloatingActionPanel: NSPanel {
     private let contentViewModel: FloatingPanelViewModel
     private var cancellables = Set<AnyCancellable>()
-    
-    init(context: ClipboardContext, actions: [SuggestedAction]) {
+    private var keyEventMonitor: Any?
+
+    init(context: ClipboardContext, actions: [SuggestedAction], onActionStarted: (() -> Void)? = nil) {
         self.contentViewModel = FloatingPanelViewModel(context: context, actions: actions)
-        
+        contentViewModel.onActionStarted = onActionStarted
+
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
-        
+
         setupWindow()
         setupContent()
+        setupBindings()
+        setupEventMonitor()
         positionWindowNearCursor()
-        
-        // Setup close callback
+
         contentViewModel.requestClose = { [weak self] in
             self?.close()
         }
     }
-    
+
     private func setupWindow() {
         isFloatingPanel = true
         level = .popUpMenu
@@ -39,25 +42,52 @@ class FloatingActionPanel: NSPanel {
         contentView?.layer?.cornerRadius = 12
         contentView?.layer?.masksToBounds = true
     }
-    
+
     private func setupContent() {
         let hostingView = NSHostingView(rootView: FloatingPanelView(viewModel: contentViewModel))
         contentView = hostingView
     }
-    
+
+    private func setupBindings() {
+        contentViewModel.$processingState
+            .combineLatest(contentViewModel.$resultText, contentViewModel.$executedAction)
+            .throttle(for: .milliseconds(100), scheduler: RunLoop.main, latest: true)
+            .sink { [weak self] _, _, _ in
+                self?.resizeForCurrentContent(animated: true)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func setupEventMonitor() {
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            guard event.window === self else { return event }
+
+            if event.keyCode == 53 {
+                if self.contentViewModel.isGenerating {
+                    self.contentViewModel.stopGeneration()
+                } else {
+                    self.close()
+                }
+                return nil
+            }
+
+            return event
+        }
+    }
+
     private func positionWindowNearCursor() {
         let mouseLocation = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main
-        
+
         guard let screen = screen else { return }
-        
-        let panelSize = CGSize(width: 400, height: min(300, 100 + contentViewModel.actions.count * 50))
+
+        let panelSize = CGSize(width: 400, height: desiredPanelHeight())
         var origin = NSPoint(
             x: mouseLocation.x - panelSize.width / 2,
             y: mouseLocation.y - panelSize.height - 20
         )
-        
-        // Ensure window stays on screen
+
         if origin.x < screen.frame.minX {
             origin.x = screen.frame.minX + 10
         }
@@ -67,44 +97,94 @@ class FloatingActionPanel: NSPanel {
         if origin.y < screen.frame.minY {
             origin.y = mouseLocation.y + 20
         }
-        
+
         setFrame(NSRect(origin: origin, size: panelSize), display: true)
     }
-    
+
+    private func resizeForCurrentContent(animated: Bool) {
+        let newHeight = desiredPanelHeight()
+        let currentFrame = frame
+        guard abs(currentFrame.height - newHeight) > 1 else { return }
+
+        var newFrame = currentFrame
+        newFrame.origin.y -= (newHeight - currentFrame.height)
+        newFrame.size.height = newHeight
+
+        if let screen = screen ?? NSScreen.screens.first(where: { $0.frame.intersects(currentFrame) }) {
+            if newFrame.origin.y < screen.frame.minY + 10 {
+                newFrame.origin.y = screen.frame.minY + 10
+            }
+            if newFrame.maxY > screen.frame.maxY - 10 {
+                newFrame.origin.y = screen.frame.maxY - newFrame.height - 10
+            }
+        }
+
+        setFrame(newFrame, display: true, animate: animated)
+    }
+
+    private func desiredPanelHeight() -> CGFloat {
+        if contentViewModel.executedAction == nil {
+            return min(300, 100 + CGFloat(contentViewModel.actions.count) * 50)
+        }
+
+        switch contentViewModel.processingState {
+        case .idle:
+            return min(300, 100 + CGFloat(contentViewModel.actions.count) * 50)
+        case .processing:
+            return 150
+        case .completed:
+            if let resultText = contentViewModel.resultText, !resultText.isEmpty {
+                let lineCount = max(1, resultText.components(separatedBy: .newlines).count)
+                let previewHeight = min(420, max(140, CGFloat(lineCount) * 18))
+                return min(620, 120 + previewHeight + (contentViewModel.isResultInClipboard ? 28 : 0))
+            }
+            return contentViewModel.isResultInClipboard ? 170 : 150
+        }
+    }
+
     func show() {
         makeKeyAndOrderFront(nil)
         becomeFirstResponder()
-        
-        // Auto-close after 30 seconds of inactivity
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
             if self?.contentViewModel.processingState == .idle {
                 self?.close()
             }
         }
     }
-    
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
-    
+
+    override func close() {
+        contentViewModel.stopGeneration()
+        if let keyEventMonitor {
+            NSEvent.removeMonitor(keyEventMonitor)
+            self.keyEventMonitor = nil
+        }
+        super.close()
+    }
+
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
-        case 126: // Up arrow
-            contentViewModel.selectPrevious()
-        case 125: // Down arrow
-            contentViewModel.selectNext()
-        case 36: // Return/Enter
-            contentViewModel.executeSelected()
-        case 53: // Escape
-            close()
+        case 126: contentViewModel.selectPrevious()
+        case 125: contentViewModel.selectNext()
+        case 36: contentViewModel.executeSelected()
+        case 53:
+            if contentViewModel.isGenerating {
+                contentViewModel.stopGeneration()
+            } else {
+                close()
+            }
         default:
             super.keyDown(with: event)
         }
     }
-    
+
     func updateProcessingState(_ state: ProcessingState) {
         contentViewModel.processingState = state
     }
-    
+
     func showResult(_ text: String, isInClipboard: Bool = false) {
         contentViewModel.showResult(text, isInClipboard: isInClipboard)
     }
@@ -113,12 +193,19 @@ class FloatingActionPanel: NSPanel {
 @MainActor
 class FloatingPanelViewModel: ObservableObject {
     let context: ClipboardContext
+    private static let executionTimeoutNanoseconds: UInt64 = 30_000_000_000
     @Published var actions: [SuggestedAction]
     @Published var selectedIndex: Int = 0
     @Published var processingState: ProcessingState = .idle
     @Published var executedAction: SuggestedAction?
     @Published var resultText: String?
     @Published var isResultInClipboard: Bool = false
+    @Published var isGenerating: Bool = false
+    private var activeExecutionID: UUID?
+    private var cancelGeneration: (() -> Void)?
+
+    var onActionStarted: (() -> Void)?
+    var requestClose: (() -> Void)?
 
     init(context: ClipboardContext, actions: [SuggestedAction]) {
         self.context = context
@@ -137,21 +224,7 @@ class FloatingPanelViewModel: ObservableObject {
     }
 
     var contentTypeDescription: String {
-        let topLevelType: String
-        switch context.snapshot.kind {
-        case .url:
-            topLevelType = "URL"
-        case .fileURLs:
-            topLevelType = context.snapshot.fileURLs?.count == 1 ? "File" : "Files"
-        case .image:
-            topLevelType = "Image"
-        case .plainText:
-            topLevelType = "Plain Text"
-        case .richText:
-            topLevelType = "Rich Text"
-        case .unknown:
-            topLevelType = "Unknown"
-        }
+        let topLevelType = context.snapshot.primaryContentLabel
 
         let tags = context.snapshot.detectedEntities
             .map(\.displayName)
@@ -184,27 +257,73 @@ class FloatingPanelViewModel: ObservableObject {
     func executeSelected() {
         guard processingState == .idle, selectedIndex < actions.count else { return }
         let action = actions[selectedIndex]
+        let executionID = UUID()
+        activeExecutionID = executionID
+        resultText = nil
+        isResultInClipboard = false
+        isGenerating = false
         executedAction = action
-        processingState = .processing("Running…")
-        action.perform { [weak self] text, isInClipboard in
-            self?.showResult(text, isInClipboard: isInClipboard)
+        processingState = .processing("Running \(action.title)…")
+
+        onActionStarted?()
+
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: Self.executionTimeoutNanoseconds)
+            guard let self else { return }
+            guard self.activeExecutionID == executionID, self.processingState != .completed else { return }
+            self.stopGeneration()
+            self.showResult("Failed: Action timed out", isInClipboard: false)
         }
+
+        cancelGeneration = action.perform(
+            { [weak self] text, isInClipboard in
+                guard let self, self.activeExecutionID == executionID else { return }
+                self.showResult(text, isInClipboard: isInClipboard)
+            },
+            { [weak self] token in
+                guard let self, self.activeExecutionID == executionID else { return }
+                if !self.isGenerating {
+                    self.isGenerating = true
+                    self.processingState = .completed
+                }
+                self.resultText = (self.resultText ?? "") + token
+            }
+        )
     }
 
     func showResult(_ text: String, isInClipboard: Bool) {
-        resultText = text
+        activeExecutionID = nil
+        cancelGeneration = nil
+        isGenerating = false
+        if text.isEmpty, isInClipboard {
+            resultText = NSPasteboard.general.string(forType: .string)
+        } else {
+            resultText = text
+        }
         isResultInClipboard = isInClipboard
         processingState = .completed
     }
 
-    var requestClose: (() -> Void)?
+    func stopGeneration() {
+        guard isGenerating || cancelGeneration != nil else { return }
+        cancelGeneration?()
+        cancelGeneration = nil
+        isGenerating = false
+        activeExecutionID = nil
+        if let text = resultText, !text.isEmpty {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            isResultInClipboard = true
+        }
+        processingState = .completed
+    }
 }
 
 enum ProcessingState: Equatable {
     case idle
     case processing(String)
     case completed
-    
+
     var description: String {
         switch self {
         case .idle: return ""
@@ -216,7 +335,7 @@ enum ProcessingState: Equatable {
 
 struct FloatingPanelView: View {
     @ObservedObject var viewModel: FloatingPanelViewModel
-    
+
     var body: some View {
         VStack(spacing: 0) {
             headerSection
@@ -234,7 +353,7 @@ struct FloatingPanelView: View {
         .shadow(radius: 20)
         .animation(.easeInOut(duration: 0.2), value: viewModel.executedAction != nil)
     }
-    
+
     private var headerSection: some View {
         HStack(spacing: 10) {
             Image(systemName: viewModel.contentTypeIcon)
@@ -255,7 +374,7 @@ struct FloatingPanelView: View {
         .padding(.vertical, 10)
         .background(Color(NSColor.textBackgroundColor).opacity(0.5))
     }
-    
+
     private var actionsSection: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -283,7 +402,7 @@ struct FloatingPanelView: View {
         }
         .frame(maxHeight: 200)
     }
-    
+
     private var executedSection: some View {
         VStack(spacing: 0) {
             if let action = viewModel.executedAction {
@@ -296,7 +415,14 @@ struct FloatingPanelView: View {
                         .font(.body)
                         .fontWeight(.medium)
                     Spacer()
-                    if case .processing = viewModel.processingState {
+                    if viewModel.isGenerating {
+                        Button(action: { viewModel.stopGeneration() }) {
+                            Image(systemName: "stop.circle.fill")
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    } else if case .processing = viewModel.processingState {
                         ProgressView()
                             .controlSize(.small)
                     } else if viewModel.processingState == .completed {
@@ -309,22 +435,11 @@ struct FloatingPanelView: View {
                 .padding(.vertical, 10)
             }
 
-            if viewModel.processingState == .completed {
+            if viewModel.processingState != .idle {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 8) {
-                    if let text = viewModel.resultText, !text.isEmpty {
-                        ScrollView {
-                            Text(text)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(maxHeight: 200)
-                    }
-
-                    if viewModel.isResultInClipboard {
+                    if viewModel.processingState == .completed, viewModel.isResultInClipboard, !viewModel.isGenerating {
                         HStack(spacing: 6) {
                             Image(systemName: "doc.on.clipboard.fill")
                                 .font(.caption)
@@ -340,6 +455,27 @@ struct FloatingPanelView: View {
                                 .cornerRadius(3)
                                 .foregroundStyle(.tertiary)
                         }
+                    }
+
+                    if case .processing(let message) = viewModel.processingState {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(message)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 6)
+                    } else if let text = viewModel.resultText, !text.isEmpty {
+                        ScrollView {
+                            Text(text)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(maxHeight: 420)
                     }
                 }
                 .padding(.horizontal, 14)

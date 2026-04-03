@@ -52,15 +52,22 @@ final class LLMService {
     
     private init() {}
     
-    func summarizeText(_ text: String) async throws -> String {
-        // Check if local LLM should be used
+    func summarizeText(
+        _ text: String,
+        onToken: (@Sendable (String) -> Void)? = nil
+    ) async throws -> String {
         let useLocal = UserDefaults.standard.bool(forKey: "useLocalLLM")
         if useLocal {
-            // Ensure model is loaded
+            if !LocalLLMService.shared.isReady && LocalLLMService.shared.isLoading {
+                await LocalLLMService.shared.waitUntilReady()
+            }
             if !LocalLLMService.shared.isReady && !LocalLLMService.shared.isLoading {
                 await LocalLLMService.shared.loadModel()
             }
-            return try await LocalLLMService.shared.summarize(text)
+            guard LocalLLMService.shared.isReady else {
+                throw LLMError.modelNotAvailable
+            }
+            return try await LocalLLMService.shared.summarize(text, onToken: onToken)
         }
         
         // Get API key from settings
@@ -88,9 +95,7 @@ final class LLMService {
         return response.choices.first?.message.content.trimmingCharacters(in: .whitespacesAndNewlines) ?? "No summary generated."
     }
     
-    private let summarizeSystemPrompt = """
-    Summarize the clipboard text into a short, clear summary. Preserve the main point and the most important supporting details. Omit repetition, filler, and minor examples. Use a neutral professional tone. Default to 3-5 bullet points. If the source is very short, return a single sentence. Do not add headings, commentary, or information not present in the source.
-    """
+    private let summarizeSystemPrompt = "Summarize into 3-5 bullet points. Keep the main point and key details. Cut filler and repetition. If very short, use one sentence. No headings or commentary."
     
     private func makeRequest(request: LLMRequest, apiKey: String) async throws -> LLMResponse {
         guard let url = URL(string: baseURL) else {
