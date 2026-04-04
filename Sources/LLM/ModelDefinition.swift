@@ -52,13 +52,22 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             defaultTemperature: 1.0
         ),
         ModelDefinition(
-            id: "gemma-4-e4b",
-            name: "Gemma 4 E4B Instruct",
-            repo: "ggml-org/gemma-4-E4B-it-GGUF",
-            filename: "gemma-4-e4b-it-Q8_0.gguf",
-            sizeLabel: "~8 GB",
-            chatTemplate: .gemma,
-            defaultTemperature: 1.0
+            id: "qwen-0.8b",
+            name: "Qwen 3.5 0.8B",
+            repo: "unsloth/Qwen3.5-0.8B-GGUF",
+            filename: "Qwen3.5-0.8B-Q8_0.gguf",
+            sizeLabel: "~0.8 GB",
+            chatTemplate: .chatml,
+            defaultTemperature: 0.7
+        ),
+        ModelDefinition(
+            id: "qwen-2b",
+            name: "Qwen 3.5 2B",
+            repo: "unsloth/Qwen3.5-2B-GGUF",
+            filename: "Qwen3.5-2B-Q8_0.gguf",
+            sizeLabel: "~2 GB",
+            chatTemplate: .chatml,
+            defaultTemperature: 0.7
         ),
     ]
 
