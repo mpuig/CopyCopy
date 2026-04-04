@@ -253,6 +253,7 @@ enum SkillParser {
         "decodeURL": "text",
         "stripANSI": "text",
         "htmlToMarkdown": "html",
+        "htmlToMarkdownLLM": "html",
         "copyToClipboard": "text",
         "saveTempFile": "text",
         "revealPath": "path",

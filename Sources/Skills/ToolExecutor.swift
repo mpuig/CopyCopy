@@ -122,6 +122,18 @@ final class ToolExecutor {
                 let html = try requiredText(parameters["html"] ?? primaryHTML(from: context) ?? primaryText(from: context))
                 executeHTMLToMarkdown(html, completion: completion)
 
+            case .htmlToMarkdownLLM:
+                let html = try requiredText(parameters["html"] ?? primaryHTML(from: context) ?? primaryText(from: context))
+                let systemPrompt = parameters["systemPrompt"] ?? "Clean up this Markdown. Remove navigation, menus, sidebars, footers, and UI elements. Keep only the article content. Fix broken formatting. Output only clean Markdown."
+                return executeHTMLToMarkdownLLM(
+                    html: html,
+                    systemPrompt: systemPrompt,
+                    temperature: temperature ?? modelDefaultTemperature,
+                    completion: completion,
+                    onToken: onToken,
+                    onStatus: onStatus
+                )
+
             case .revealPath:
                 let path = try requiredText(parameters["path"] ?? primaryText(from: context))
                 let url = try ToolValidator.resolveExistingPath(path)
@@ -638,6 +650,49 @@ final class ToolExecutor {
                 }
             }
         }
+    }
+
+    private func executeHTMLToMarkdownLLM(
+        html: String,
+        systemPrompt: String,
+        temperature: Float,
+        completion: @escaping ActionCompletion,
+        onToken: @escaping StreamCallback,
+        onStatus: @escaping StatusCallback
+    ) -> (() -> Void)? {
+        let task = Task.detached { [weak self] in
+            guard let self else { return }
+            do {
+                // Step 1: Convert HTML → Markdown
+                await MainActor.run { onStatus("Converting HTML…") }
+                let rawMarkdown = try await HTMLMarkdownConverter.convertAsync(html)
+
+                // Step 2: Send to LLM for cleanup
+                await self.ensureModelReady(onStatus: onStatus)
+                let result = try await self.withLLMTimeout {
+                    try await LocalLLMService.shared.generate(
+                        prompt: self.truncate(rawMarkdown),
+                        systemPrompt: systemPrompt,
+                        temperature: temperature,
+                        maxTokens: 1500,
+                        onToken: { token in
+                            Task { @MainActor in onToken(token) }
+                        }
+                    )
+                }
+                await MainActor.run {
+                    self.copyToClipboard(result)
+                    completion(result, true)
+                }
+            } catch is CancellationError {
+                // Partial result already streamed
+            } catch {
+                await MainActor.run {
+                    completion("Failed: \(error.localizedDescription)", false)
+                }
+            }
+        }
+        return { task.cancel() }
     }
 
     private func executeFetchURL(

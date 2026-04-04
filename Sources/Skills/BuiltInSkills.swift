@@ -5,6 +5,7 @@ enum BuiltInSkills {
         ("read-article", readArticle),
         ("clean-text", cleanText),
         ("html-to-markdown", htmlToMarkdown),
+        ("smart-markdown", smartMarkdown),
         ("fix-grammar", fixGrammar),
         ("summarize", summarize),
         ("translate", translate),
@@ -60,6 +61,22 @@ source-boosts:
 ---
 
 htmlToMarkdown({clipboardHTML})
+"""
+
+    static let smartMarkdown = """
+---
+name: Smart Markdown
+description: Convert HTML to clean Markdown with AI cleanup
+icon: wand.and.stars
+content-types: text
+entity-types: html
+source-boosts:
+  browser: 110
+  email: 90
+  notes: 80
+---
+
+htmlToMarkdownLLM({clipboardHTML})
 """
 
     static let fixGrammar = """

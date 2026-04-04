@@ -14,6 +14,7 @@ enum ExecuteFunction: String, CaseIterable {
     case decodeURL
     case stripANSI
     case htmlToMarkdown
+    case htmlToMarkdownLLM
     case revealPath
     case openInTerminal
     case ping
@@ -38,6 +39,7 @@ enum ExecuteFunction: String, CaseIterable {
         case .decodeURL: return "Decode URL"
         case .stripANSI: return "Strip ANSI"
         case .htmlToMarkdown: return "HTML to Markdown"
+        case .htmlToMarkdownLLM: return "Smart Markdown"
         case .revealPath: return "Reveal Path"
         case .openInTerminal: return "Open in Terminal"
         case .ping: return "Ping Host"
