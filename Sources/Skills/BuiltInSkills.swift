@@ -21,7 +21,7 @@ enum BuiltInSkills {
     static let readArticle = """
 ---
 name: Read Article
-description: Fetch URL and extract clean article as Markdown
+description: Fetch URL and extract clean article
 icon: doc.text
 content-types: url
 source-boosts:
@@ -34,7 +34,7 @@ fetchURL({clipboardURL})
     static let cleanText = """
 ---
 name: Clean Text
-description: Remove formatting junk and fix whitespace
+description: Strip formatting and fix whitespace
 icon: sparkles
 content-types: text
 source-boosts:
@@ -49,7 +49,7 @@ copyToClipboard({clipboardClean})
     static let htmlToMarkdown = """
 ---
 name: Convert to Markdown
-description: Convert HTML to Markdown
+description: Convert HTML to clean Markdown
 icon: arrow.down.doc.text
 content-types: text
 entity-types: html
@@ -76,14 +76,7 @@ source-boosts:
   other: 50
 ---
 
-You are a proofreader. Fix errors in the text below.
-
-Rules:
-- Fix grammar, spelling, and punctuation errors
-- Preserve the original meaning, tone, and style
-- Do not rewrite sentences that are already correct
-- Do not add or remove content
-- Output only the corrected text, nothing else
+Fix grammar, spelling, and punctuation. Preserve meaning and tone. Do not rewrite correct sentences. Output only the corrected text.
 """
 
     static let summarize = """
@@ -108,7 +101,7 @@ Summarize into key points
     static let translate = """
 ---
 name: Translate
-description: Translate foreign text to English
+description: Translate to English
 icon: globe
 content-types: text
 entity-types: foreignLanguage
@@ -118,13 +111,7 @@ source-boosts:
   other: 25
 ---
 
-You are a translator. Translate the text below to English.
-
-Rules:
-- Translate accurately, preserving meaning and tone
-- Keep proper nouns, brand names, and technical terms unchanged
-- If the text is already in English, return it unchanged
-- Output only the English translation, nothing else
+Translate to English. Keep proper nouns and technical terms unchanged. Output only the translation.
 """
 
     static let draftChatReply = """
@@ -140,15 +127,7 @@ source-boosts:
   chat: 150
 ---
 
-You are drafting a short chat reply. The text below is a conversation.
-
-Rules:
-- Reply in the SAME LANGUAGE as the conversation
-- Reply ONLY to the last message — use earlier messages as context only
-- Be short, natural, and match the tone (casual/formal/funny as appropriate)
-- Reference specific details from the conversation — do NOT make up facts
-- Do NOT add greetings, signatures, or meta-commentary
-- Output only the reply message, nothing else
+Reply to the last message in the conversation. Use the same language. Be short and natural. Match the tone. Reference specific details — do not invent facts. Output only the reply.
 """
 
     static let rewriteEmail = """
@@ -163,14 +142,7 @@ source-boosts:
   email: 120
 ---
 
-You are an email editor. Rewrite the text below as a polished email.
-
-Rules:
-- Preserve the original intent, key facts, and commitments
-- Improve clarity, grammar, and professional tone
-- Keep it concise — no unnecessary padding or formality
-- Do not add a subject line
-- Output only the email body, nothing else
+Rewrite as a polished email. Keep intent, facts, and commitments. Fix clarity and tone. No subject line. Output only the email body.
 """
 
     static let extractActionItems = """
@@ -181,20 +153,14 @@ icon: checklist
 content-types: text
 text-source: clipboardChatCleaned
 minimum-chars: 500
+temperature: 0
 source-boosts:
   chat: 110
   email: 90
   notes: 80
 ---
 
-You are extracting action items from the text below.
-
-Rules:
-- List each action item as a bullet point starting with "- "
-- Include the owner (who) and deadline (when) if mentioned
-- Only include items EXPLICITLY stated in the text — never invent
-- If no action items exist, output only: "No action items found."
-- Output only the bullet list, nothing else
+Extract action items as a bullet list. Include owner and deadline if mentioned. Only include items explicitly stated — never invent. If none found, say "No action items." Output only the list.
 """
 
     static let explainCode = """
@@ -210,14 +176,7 @@ source-boosts:
   terminal: 50
 ---
 
-You are a code explainer. Explain the code below.
-
-Rules:
-- Describe what the code does in plain language
-- List key logic, inputs, outputs, and any risks
-- Use short bullet points
-- Do not rewrite or modify the code
-- Output only the explanation, nothing else
+Explain what this code does. Cover key logic, inputs, outputs, and risks. Use short bullet points. Do not rewrite the code. Output only the explanation.
 """
 
     static let openFile = """
