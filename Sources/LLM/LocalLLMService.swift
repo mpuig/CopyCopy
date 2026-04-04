@@ -84,8 +84,8 @@ final class LocalLLMService: ObservableObject {
         downloadingModels[definition.id] = 0
 
         do {
-            let localPath = try await downloadGGUF(definition: definition)
-            Logger.info("Downloaded model: \(definition.name) → \(localPath.path)", category: .general)
+            try await downloadToHFCache(definition: definition)
+            Logger.info("Downloaded model: \(definition.name)", category: .general)
         } catch {
             Logger.error("Failed to download \(definition.name): \(error)", category: .general)
         }
@@ -94,53 +94,58 @@ final class LocalLLMService: ObservableObject {
     }
 
     private func ensureModelDownloaded(_ definition: ModelDefinition) async throws -> URL {
-        if definition.isDownloaded {
-            return definition.localPath
+        if let path = HFCache.resolvedPath(for: definition) {
+            return path
         }
 
         loadingProgress = "Downloading \(definition.name)..."
         downloadingModels[definition.id] = 0
 
-        let localPath = try await downloadGGUF(definition: definition)
+        try await downloadToHFCache(definition: definition)
         downloadingModels.removeValue(forKey: definition.id)
-        return localPath
+
+        guard let path = HFCache.resolvedPath(for: definition) else {
+            throw LocalLLMError.modelNotLoaded
+        }
+        return path
     }
 
-    private func downloadGGUF(definition: ModelDefinition) async throws -> URL {
-        let cacheDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".copycopy/models")
-        try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
-
-        let localPath = cacheDir.appendingPathComponent(definition.filename)
+    private func downloadToHFCache(definition: ModelDefinition) async throws {
         let modelId = definition.id
 
-        let tempURL: URL = try await withCheckedThrowingContinuation { continuation in
-            let delegate = DownloadDelegate(
-                onProgress: { [weak self] progress in
-                    Task { @MainActor in
-                        self?.downloadingModels[modelId] = progress
-                        self?.downloadProgress = progress
-                        let percent = Int(progress * 100)
-                        self?.loadingProgress = "Downloading: \(percent)%"
-                    }
-                },
-                onComplete: { url, error in
-                    if let error {
-                        continuation.resume(throwing: error)
-                    } else if let url {
-                        continuation.resume(returning: url)
-                    } else {
-                        continuation.resume(throwing: LocalLLMError.modelNotLoaded)
-                    }
-                }
-            )
+        // Fetch metadata (SHA256, commit) via HEAD request
+        loadingProgress = "Resolving \(definition.name)..."
+        let metadata = try? await HFCache.fetchMetadata(for: definition)
 
-            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
-            session.downloadTask(with: definition.downloadURL).resume()
+        let downloader = ModelDownloader { [weak self] progress in
+            Task { @MainActor in
+                self?.downloadingModels[modelId] = progress
+                self?.downloadProgress = progress
+                let percent = Int(progress * 100)
+                self?.loadingProgress = "Downloading: \(percent)%"
+            }
         }
 
-        try FileManager.default.moveItem(at: tempURL, to: localPath)
-        return localPath
+        if let metadata {
+            // HF cache layout: download to blobs, symlink from snapshots
+            let (blobPath, snapshotLink) = try HFCache.prepareCache(
+                for: definition, sha256: metadata.sha256, commit: metadata.commit
+            )
+
+            if !FileManager.default.fileExists(atPath: blobPath.path) {
+                try await downloader.download(from: definition.downloadURL, to: blobPath)
+            }
+
+            try HFCache.createSymlink(from: snapshotLink, to: blobPath)
+        } else {
+            // Fallback to legacy flat directory if HEAD request fails
+            let cacheDir = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".copycopy/models")
+            try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+            let localPath = cacheDir.appendingPathComponent(definition.filename)
+
+            try await downloader.download(from: definition.downloadURL, to: localPath)
+        }
     }
 
     func generate(
@@ -414,38 +419,6 @@ actor LlamaContext {
     }
 }
 
-// MARK: - Download Delegate
-
-private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-    let onProgress: (Double) -> Void
-    let onComplete: (URL?, Error?) -> Void
-
-    init(
-        onProgress: @escaping (Double) -> Void,
-        onComplete: @escaping (URL?, Error?) -> Void
-    ) {
-        self.onProgress = onProgress
-        self.onComplete = onComplete
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        // Copy to a temp location that won't be cleaned up when this method returns
-        let tempCopy = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".gguf")
-        try? FileManager.default.copyItem(at: location, to: tempCopy)
-        onComplete(tempCopy, nil)
-    }
-
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let error {
-            onComplete(nil, error)
-        }
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard totalBytesExpectedToWrite > 0 else { return }
-        onProgress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
-    }
-}
 
 // MARK: - Errors
 

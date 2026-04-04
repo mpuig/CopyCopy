@@ -74,7 +74,7 @@ struct SettingsGeneralPane: View {
                         modelRow(model)
                     }
 
-                    Text("On-device model for AI actions. No data leaves your Mac.\nModels cached in ~/.copycopy/models/")
+                    Text("On-device model for AI actions. No data leaves your Mac.\nModels cached in ~/.cache/huggingface/hub/")
                         .foregroundStyle(.secondary)
                 }
 

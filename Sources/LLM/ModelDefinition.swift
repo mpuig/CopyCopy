@@ -14,13 +14,11 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
     }
 
     var localPath: URL {
-        let cacheDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".copycopy/models")
-        return cacheDir.appendingPathComponent(filename)
+        HFCache.resolvedPath(for: self) ?? HFCache.legacyPath(for: self)
     }
 
     var isDownloaded: Bool {
-        FileManager.default.fileExists(atPath: localPath.path)
+        HFCache.isDownloaded(self)
     }
 
     static let all: [ModelDefinition] = [
