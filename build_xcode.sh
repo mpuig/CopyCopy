@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e
 
-echo "Building CopyCopy with Xcode (required for MLX Metal shaders)..."
+echo "Building CopyCopy..."
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
-# Build using xcodebuild
-echo "Building with xcodebuild (this may take a few minutes)..."
+# Build using xcodebuild (handles XCFramework linking)
+echo "Building with xcodebuild..."
 xcodebuild -scheme CopyCopy \
     -destination 'platform=macOS,arch=arm64' \
     -configuration Release \
@@ -36,7 +36,7 @@ cp "$BUILT_BINARY" "$APP_DIR/Contents/MacOS/CopyCopy"
 for framework in "$ROOT_DIR/.build/derived/Build/Products/Release/"*.framework; do
     if [ -d "$framework" ]; then
         cp -R "$framework" "$APP_DIR/Contents/Frameworks/"
-        echo "✅ Copied $(basename "$framework")"
+        echo "  Copied $(basename "$framework")"
     fi
 done
 
@@ -75,16 +75,9 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Update rpaths and sign
+# Sign
 codesign --force --deep --sign - "$APP_DIR" >/dev/null 2>&1 || true
 
 echo ""
 echo "✅ Build complete: dist/CopyCopy.app"
-echo ""
-echo "Note: This build includes Metal shaders for MLX."
-echo "The model will download automatically on first use (~77MB)."
-
-echo ""
-echo "✅ Build complete: dist/CopyCopy.app"
-echo ""
-echo "Note: This build includes Metal shaders for MLX."
+echo "   Models download on first use to ~/.copycopy/models/"
