@@ -3,7 +3,6 @@ import Foundation
 enum BuiltInSkills {
     static let all: [(id: String, content: String)] = [
         ("read-article", readArticle),
-        ("clean-text", cleanText),
         ("html-to-markdown", htmlToMarkdown),
         ("smart-markdown", smartMarkdown),
         ("fix-grammar", fixGrammar),
