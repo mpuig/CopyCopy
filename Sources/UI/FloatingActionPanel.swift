@@ -476,8 +476,7 @@ struct FloatingPanelView: View {
                     } else if let text = viewModel.resultText, !text.isEmpty {
                         ScrollView {
                             Text(text)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(.body)
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
