@@ -45,10 +45,20 @@ enum ContentExtractor {
 
     private static let removableSelectors = [
         "script", "style", "noscript", "svg", "canvas", "iframe",
-        "form", "dialog", "button", "select", "textarea"
+        "form", "dialog", "button", "select", "textarea",
+        "nav", "[role='navigation']", "[role='banner']", "[role='complementary']",
+        "[data-testid='sidebarColumn']", "[data-testid='DMDrawer']",
+        "[data-testid='TopNavBar']", "[data-testid='BottomBar']",
+        "[aria-label='Keyboard shortcuts']"
     ]
 
     private static let entryPointSelectors: [(selector: String, boost: Double)] = [
+        // SPA-specific high-priority selectors
+        ("[data-testid='primaryColumn']", 44),
+        ("[data-testid='tweetText']", 42),
+        ("[data-testid='tweet']", 42),
+        ("[data-testid='cellInnerDiv']", 38),
+        // Standard semantic selectors
         ("article", 40),
         ("[role='article']", 36),
         ("main", 34),
@@ -77,13 +87,23 @@ enum ContentExtractor {
         "advert", "ad-", "ads", "banner", "breadcrumb", "comment", "cookie",
         "footer", "header", "hero", "menu", "modal", "nav", "newsletter",
         "pagination", "popup", "promo", "recommend", "related", "share",
-        "sidebar", "social", "sponsor", "subscribe", "toolbar", "widget"
+        "sidebar", "social", "sponsor", "subscribe", "toolbar", "widget",
+        "trending", "discover", "explore", "topbar", "bottombar", "drawer",
+        "suggestions", "who-to-follow", "relevant-people", "profile-card"
     ]
 
     private static let negativeTextPatterns = [
         "all rights reserved", "cookie policy", "follow us", "more articles",
         "newsletter", "privacy policy", "related posts", "share this", "sign up",
-        "subscribe", "terms of service", "trending"
+        "subscribe", "terms of service", "trending", "what's happening",
+        "who to follow", "relevant people", "discover more", "show more",
+        "view keyboard shortcuts", "keyboard shortcuts", "skip to main content",
+        "accessibility", "ads info"
+    ]
+
+    private static let socialLinkDomains = [
+        "twitter.com", "x.com", "facebook.com", "instagram.com", "linkedin.com",
+        "youtube.com", "tiktok.com", "reddit.com", "github.com", "t.co"
     ]
 
     private static let breadcrumbHeadingPattern = try! NSRegularExpression(
@@ -311,6 +331,22 @@ enum ContentExtractor {
             }
 
             if looksLikeBoilerplateText && words < 160 {
+                try element.remove()
+                continue
+            }
+
+            // Remove blocks heavy on social links (profile cards, share sections)
+            let socialLinkCount = try links.reduce(0) { partial, link in
+                let href = (try? link.attr("href")) ?? ""
+                return partial + (socialLinkDomains.contains(where: { href.contains($0) }) ? 1 : 0)
+            }
+            if socialLinkCount >= 2 && words < 100 && linkDensity > 0.3 {
+                try element.remove()
+                continue
+            }
+
+            // Remove very short high-link-density blocks (nav menus, tab bars)
+            if words < 30 && links.count >= 3 && linkDensity > 0.6 {
                 try element.remove()
                 continue
             }
