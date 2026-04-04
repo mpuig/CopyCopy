@@ -11,7 +11,6 @@ final class AppModel: ObservableObject {
     @Published var triggerPulseID: UUID = UUID()
 
     private let settings: AppSettings
-    private let actionsStore: CustomActionsStore
     private let skillLoader = SkillLoader()
     private let actionExecutor = ToolExecutor()
     private let permissions = PermissionsManager()
@@ -38,9 +37,8 @@ final class AppModel: ObservableObject {
         static let permissionRefreshInterval: TimeInterval = 1.5
     }
 
-    init(settings: AppSettings, actionsStore: CustomActionsStore) {
+    init(settings: AppSettings) {
         self.settings = settings
-        self.actionsStore = actionsStore
         self.copyEventTap.doublePressThreshold = settings.doubleCopyThresholdMs / 1000.0
         start()
 

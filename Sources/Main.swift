@@ -15,8 +15,7 @@ struct CopyCopyApp: App {
 
     init() {
         let settings = AppSettings()
-        let actionsStore = CustomActionsStore()
-        let model = AppModel(settings: settings, actionsStore: actionsStore)
+        let model = AppModel(settings: settings)
         _settings = StateObject(wrappedValue: settings)
         _model = StateObject(wrappedValue: model)
     }
