@@ -38,7 +38,7 @@ open /Applications/CopyCopy.app
 
 ### Build from source
 
-For the packaged app bundle, use the Xcode build. The local LFM model depends on MLX Metal shader resources that are not packaged correctly by the plain SwiftPM build.
+For the packaged app bundle, use the Xcode build. The llama.cpp XCFramework requires Xcode's framework linking.
 
 ```bash
 git clone https://github.com/mpuig/copycopy.git
@@ -146,7 +146,7 @@ Rebuild with:
 ./build_xcode.sh
 ```
 
-The plain `./build.sh` bundle does not package MLX Metal shader resources correctly for the local model runtime.
+The plain `swift build` binary does not include the llama.cpp XCFramework correctly. Use `./build_xcode.sh` for the full app bundle.
 
 ### Edited skills are not taking effect
 

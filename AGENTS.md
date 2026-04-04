@@ -109,7 +109,7 @@ Rules:
 
 ### LLM backend
 
-Uses llama.cpp via pre-built XCFramework. GGUF models downloaded from HuggingFace to `~/.copycopy/models/`. Supports multiple models with per-model chat templates and temperature defaults.
+Uses llama.cpp via pre-built XCFramework with Metal GPU acceleration. GGUF models downloaded from HuggingFace to the standard HF cache at `~/.cache/huggingface/hub/` (shared with ollama, huggingface-cli, Python transformers). Chat templates read automatically from GGUF metadata. Supports resume, retry with backoff, and per-model temperature defaults.
 
 Available models defined in `ModelDefinition.swift`. Chat templates: ChatML (LFM), Gemma 4, Qwen.
 

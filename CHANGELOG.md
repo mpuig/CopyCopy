@@ -10,7 +10,7 @@
 ### Changed
 - Built-in skills are now the primary suggestion source.
 - Built-in skill files are exported in a readable legacy `## Actions` format on first write.
-- `README.md` and assistant guidance now describe the skill-first architecture and the MLX-safe build path.
+- `README.md` and assistant guidance now describe the skill-first architecture and the llama.cpp build path.
 
 ### Removed
 - Legacy LLM-generated clipboard action suggestions.
