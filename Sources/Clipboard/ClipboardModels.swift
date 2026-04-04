@@ -264,4 +264,19 @@ struct ClipboardContext: Sendable {
     var sourceAppContext: SourceAppContext {
         SourceAppContext(bundleIdentifier: copyEvent?.bundleID, appName: copyEvent?.appName)
     }
+
+    /// Create a synthetic context from a result text (for pipeline follow-ups).
+    static func fromResultText(_ text: String, classifier: ClipboardClassifier) -> ClipboardContext {
+        let entity = classifier.detectEntity(from: text)
+        let entities: [DetectedEntityType] = entity == .none ? [] : [entity]
+
+        let snapshot = ClipboardSnapshot(
+            changeCount: -1,
+            kind: .plainText,
+            summary: "Result (\(text.count) chars)",
+            plainText: text,
+            detectedEntities: entities
+        )
+        return ClipboardContext(copyEvent: nil, snapshot: snapshot, capturedAt: CACurrentMediaTime())
+    }
 }

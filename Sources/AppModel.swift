@@ -179,6 +179,8 @@ final class AppModel: ObservableObject {
                 let panel = FloatingActionPanel(
                     context: context,
                     actions: self.suggestedActions,
+                    skillLoader: self.skillLoader,
+                    executor: self.actionExecutor,
                     onActionStarted: { [weak self] in
                         self?.semanticClassificationTask?.cancel()
                         self?.semanticClassificationTask = nil

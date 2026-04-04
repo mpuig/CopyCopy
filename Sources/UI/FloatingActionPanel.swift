@@ -8,8 +8,8 @@ class FloatingActionPanel: NSPanel {
     private var cancellables = Set<AnyCancellable>()
     private var keyEventMonitor: Any?
 
-    init(context: ClipboardContext, actions: [SuggestedAction], onActionStarted: (() -> Void)? = nil) {
-        self.contentViewModel = FloatingPanelViewModel(context: context, actions: actions)
+    init(context: ClipboardContext, actions: [SuggestedAction], skillLoader: SkillLoader, executor: ToolExecutor, onActionStarted: (() -> Void)? = nil) {
+        self.contentViewModel = FloatingPanelViewModel(context: context, actions: actions, skillLoader: skillLoader, executor: executor)
         contentViewModel.onActionStarted = onActionStarted
 
         super.init(
@@ -47,9 +47,9 @@ class FloatingActionPanel: NSPanel {
 
     private func setupBindings() {
         contentViewModel.$processingState
-            .combineLatest(contentViewModel.$resultText, contentViewModel.$executedAction)
+            .combineLatest(contentViewModel.$resultText, contentViewModel.$executedAction, contentViewModel.$followUpActions)
             .throttle(for: .milliseconds(100), scheduler: RunLoop.main, latest: true)
-            .sink { [weak self] _, _, _ in
+            .sink { [weak self] _, _, _, _ in
                 self?.resizeForCurrentContent(animated: true)
             }
             .store(in: &cancellables)
@@ -132,10 +132,12 @@ class FloatingActionPanel: NSPanel {
         case .processing:
             return 150
         case .completed:
+            let followUpHeight = CGFloat(contentViewModel.followUpActions.count) * 40
+            let backButtonHeight: CGFloat = 40
             if let resultText = contentViewModel.resultText, !resultText.isEmpty {
                 let lineCount = max(1, resultText.components(separatedBy: .newlines).count)
-                let previewHeight = min(420, max(140, CGFloat(lineCount) * 18))
-                return min(620, 120 + previewHeight + (contentViewModel.isResultInClipboard ? 28 : 0))
+                let previewHeight = min(300, max(100, CGFloat(lineCount) * 18))
+                return min(700, 120 + previewHeight + (contentViewModel.isResultInClipboard ? 28 : 0) + followUpHeight + backButtonHeight)
             }
             return contentViewModel.isResultInClipboard ? 170 : 150
         }
@@ -194,7 +196,14 @@ class FloatingActionPanel: NSPanel {
 @MainActor
 class FloatingPanelViewModel: ObservableObject {
     let context: ClipboardContext
+    private let skillLoader: SkillLoader
+    private let executor: ToolExecutor
+    private let classifier = ClipboardClassifier()
     private static let executionTimeoutNanoseconds: UInt64 = 30_000_000_000
+    private static let followUpExcluded: Set<String> = [
+        "open-file", "reveal-in-finder", "reveal-path", "open-terminal", "read-article"
+    ]
+
     @Published var actions: [SuggestedAction]
     @Published var selectedIndex: Int = 0
     @Published var processingState: ProcessingState = .idle
@@ -202,15 +211,18 @@ class FloatingPanelViewModel: ObservableObject {
     @Published var resultText: String?
     @Published var isResultInClipboard: Bool = false
     @Published var isGenerating: Bool = false
+    @Published var followUpActions: [SuggestedAction] = []
     private var activeExecutionID: UUID?
     private var cancelGeneration: (() -> Void)?
 
     var onActionStarted: (() -> Void)?
     var requestClose: (() -> Void)?
 
-    init(context: ClipboardContext, actions: [SuggestedAction]) {
+    init(context: ClipboardContext, actions: [SuggestedAction], skillLoader: SkillLoader, executor: ToolExecutor) {
         self.context = context
         self.actions = actions
+        self.skillLoader = skillLoader
+        self.executor = executor
     }
 
     var contentTypeIcon: String {
@@ -309,6 +321,75 @@ class FloatingPanelViewModel: ObservableObject {
         }
         isResultInClipboard = isInClipboard
         processingState = .completed
+        loadFollowUpActions()
+    }
+
+    func executeFollowUp(_ action: SuggestedAction) {
+        guard processingState == .completed else { return }
+        let previousResult = resultText ?? ""
+
+        let executionID = UUID()
+        activeExecutionID = executionID
+        resultText = nil
+        isResultInClipboard = false
+        isGenerating = false
+        executedAction = action
+        followUpActions = []
+        processingState = .processing("Running \(action.title)…")
+
+        // Write previous result to clipboard so the skill reads it as input
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(previousResult, forType: .string)
+
+        UsageHistory.shared.record(
+            skillId: action.skillId,
+            contentKind: .plainText,
+            sourceContext: .other
+        )
+
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: Self.executionTimeoutNanoseconds)
+            guard let self, self.activeExecutionID == executionID, self.processingState != .completed else { return }
+            self.stopGeneration()
+            self.showResult("Failed: Action timed out", isInClipboard: false)
+        }
+
+        cancelGeneration = action.perform(
+            { [weak self] text, isInClipboard in
+                guard let self, self.activeExecutionID == executionID else { return }
+                self.showResult(text, isInClipboard: isInClipboard)
+            },
+            { [weak self] token in
+                guard let self, self.activeExecutionID == executionID else { return }
+                if !self.isGenerating {
+                    self.isGenerating = true
+                    self.processingState = .completed
+                }
+                self.resultText = (self.resultText ?? "") + token
+            }
+        )
+    }
+
+    private func loadFollowUpActions() {
+        guard let text = resultText, !text.isEmpty else {
+            followUpActions = []
+            return
+        }
+
+        let resultContext = ClipboardContext.fromResultText(text, classifier: classifier)
+        let matched = skillLoader.matchingActions(
+            for: .plainText,
+            sourceContext: .other,
+            entities: resultContext.snapshot.detectedEntities,
+            context: resultContext,
+            executor: executor
+        )
+
+        var excluded = Self.followUpExcluded
+        if let currentSkill = executedAction?.skillId {
+            excluded.insert(currentSkill)
+        }
+        followUpActions = Array(matched.filter { !excluded.contains($0.skillId) }.prefix(4))
     }
 
     func stopGeneration() {
@@ -333,6 +414,7 @@ class FloatingPanelViewModel: ObservableObject {
         executedAction = nil
         resultText = nil
         isResultInClipboard = false
+        followUpActions = []
         processingState = .idle
         selectedIndex = 0
     }
@@ -507,6 +589,18 @@ struct FloatingPanelView: View {
                 }
 
                 if viewModel.processingState == .completed {
+                    if !viewModel.followUpActions.isEmpty {
+                        VStack(spacing: 2) {
+                            ForEach(Array(viewModel.followUpActions.enumerated()), id: \.element.id) { index, action in
+                                ActionRow(action: action, isSelected: false, index: index)
+                                    .onTapGesture {
+                                        viewModel.executeFollowUp(action)
+                                    }
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+
                     HStack(spacing: 10) {
                         Image(systemName: "chevron.left")
                             .font(.body)
@@ -519,10 +613,6 @@ struct FloatingPanelView: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.clear)
-                    )
                     .contentShape(Rectangle())
                     .onTapGesture {
                         viewModel.resetToActions()
