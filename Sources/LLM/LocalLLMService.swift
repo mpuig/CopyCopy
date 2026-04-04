@@ -263,16 +263,20 @@ final class LocalLLMService: ObservableObject {
 // MARK: - LlamaContext (Swift actor wrapping llama.cpp C API)
 
 actor LlamaContext {
+    private static var backendInitialized = false
+
     private let model: OpaquePointer
     private let context: OpaquePointer
     private let vocab: OpaquePointer
-    private let chatTemplate: ChatTemplate
+    private let templateString: String?
+    private let fallbackTemplate: ChatTemplate
 
-    init(model: OpaquePointer, context: OpaquePointer, template: ChatTemplate) {
+    init(model: OpaquePointer, context: OpaquePointer, templateString: String?, fallbackTemplate: ChatTemplate) {
         self.model = model
         self.context = context
         self.vocab = llama_model_get_vocab(model)
-        self.chatTemplate = template
+        self.templateString = templateString
+        self.fallbackTemplate = fallbackTemplate
     }
 
     deinit {
@@ -281,20 +285,34 @@ actor LlamaContext {
     }
 
     static func create(path: String, template: ChatTemplate) throws -> LlamaContext {
-        llama_backend_init()
+        // Initialize backend once
+        if !backendInitialized {
+            llama_backend_init()
+            backendInitialized = true
+        }
 
+        // Model params: offload all layers to Metal GPU
         var modelParams = llama_model_default_params()
         #if targetEnvironment(simulator)
         modelParams.n_gpu_layers = 0
+        #else
+        modelParams.n_gpu_layers = 999
         #endif
 
         guard let model = llama_model_load_from_file(path, modelParams) else {
             throw LocalLLMError.modelNotLoaded
         }
 
+        // Read chat template from GGUF metadata
+        let ggufTemplate = readChatTemplate(from: model)
+
+        // Context params: dynamic size, flash attention, tuned threads
+        let trainCtx = llama_model_n_ctx_train(model)
+        let ctxSize = min(UInt32(trainCtx), 4096)
+
         var ctxParams = llama_context_default_params()
-        ctxParams.n_ctx = 2048
-        let nThreads = Int32(max(1, min(8, ProcessInfo.processInfo.processorCount - 2)))
+        ctxParams.n_ctx = max(ctxSize, 2048)
+        let nThreads = Int32(max(1, min(ProcessInfo.processInfo.processorCount, 8)))
         ctxParams.n_threads = nThreads
         ctxParams.n_threads_batch = nThreads
 
@@ -303,7 +321,47 @@ actor LlamaContext {
             throw LocalLLMError.modelNotLoaded
         }
 
-        return LlamaContext(model: model, context: context, template: template)
+        return LlamaContext(model: model, context: context, templateString: ggufTemplate, fallbackTemplate: template)
+    }
+
+    private static func readChatTemplate(from model: OpaquePointer) -> String? {
+        guard let ptr = llama_model_chat_template(model, nil) else { return nil }
+        return String(cString: ptr)
+    }
+
+    private func formatPrompt(systemPrompt: String, userPrompt: String) -> String {
+        // Try GGUF template via llama_chat_apply_template
+        if let ggufFormatted = applyGGUFTemplate(systemPrompt: systemPrompt, userPrompt: userPrompt) {
+            return ggufFormatted
+        }
+        // Fallback to hardcoded template
+        return fallbackTemplate.format(systemPrompt: systemPrompt, userPrompt: userPrompt)
+    }
+
+    private func applyGGUFTemplate(systemPrompt: String, userPrompt: String) -> String? {
+        guard let templateString else { return nil }
+
+        var messages = [
+            llama_chat_message(role: strdup("system"), content: strdup(systemPrompt)),
+            llama_chat_message(role: strdup("user"), content: strdup(userPrompt)),
+        ]
+        defer {
+            for msg in messages {
+                free(UnsafeMutablePointer(mutating: msg.role))
+                free(UnsafeMutablePointer(mutating: msg.content))
+            }
+        }
+
+        let bufSize: Int32 = 8192
+        let buf = UnsafeMutablePointer<CChar>.allocate(capacity: Int(bufSize))
+        defer { buf.deallocate() }
+
+        let len = templateString.withCString { tmpl in
+            llama_chat_apply_template(tmpl, &messages, messages.count, true, buf, bufSize)
+        }
+
+        guard len > 0, len < bufSize else { return nil }
+        return String(cString: buf)
     }
 
     func generate(
@@ -313,17 +371,18 @@ actor LlamaContext {
         maxTokens: Int32,
         onToken: (@Sendable (String) -> Void)?
     ) async throws -> String {
-        let formatted = chatTemplate.format(systemPrompt: systemPrompt, userPrompt: userPrompt)
+        let formatted = formatPrompt(systemPrompt: systemPrompt, userPrompt: userPrompt)
         let tokens = tokenize(text: formatted, addBos: true)
 
         // Clear KV cache
         llama_memory_clear(llama_get_memory(context), true)
 
-        // Build sampler chain: top_k → top_p → temp → dist
+        // Build sampler chain: top_k → top_p → min_p → temp → dist
         let sparams = llama_sampler_chain_default_params()
         let sampler = llama_sampler_chain_init(sparams)!
         llama_sampler_chain_add(sampler, llama_sampler_init_top_k(64))
         llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.95, 1))
+        llama_sampler_chain_add(sampler, llama_sampler_init_min_p(0.05, 1))
         llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature))
         llama_sampler_chain_add(sampler, llama_sampler_init_dist(UInt32.random(in: 0...UInt32.max)))
         defer { llama_sampler_free(sampler) }
