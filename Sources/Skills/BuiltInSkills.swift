@@ -52,7 +52,6 @@ name: Convert to Markdown
 description: Convert HTML to clean Markdown
 icon: arrow.down.doc.text
 content-types: text
-entity-types: html
 source-boosts:
   browser: 120
   email: 100
@@ -68,7 +67,6 @@ name: Smart Markdown
 description: Convert HTML to clean Markdown with AI cleanup
 icon: wand.and.stars
 content-types: text
-entity-types: html
 source-boosts:
   browser: 110
   email: 90

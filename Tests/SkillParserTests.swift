@@ -290,7 +290,7 @@ final class SkillParserTests: XCTestCase {
         let skill = try SkillParser.parse(id: "html-to-markdown", content: BuiltInSkills.htmlToMarkdown, isBuiltIn: true)
 
         XCTAssertEqual(skill.executeFunction, .htmlToMarkdown)
-        XCTAssertEqual(skill.entityTypes, [.html])
+        XCTAssertEqual(skill.sourceBoosts?["browser"], 120)
     }
 
     func testBuiltInDraftChatReplySkill() throws {

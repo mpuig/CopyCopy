@@ -212,6 +212,8 @@ class FloatingPanelViewModel: ObservableObject {
     @Published var isResultInClipboard: Bool = false
     @Published var isGenerating: Bool = false
     @Published var followUpActions: [SuggestedAction] = []
+    @Published var actionHistory: [SuggestedAction] = []
+    @Published var selectedFollowUpIndex: Int = 0
     private var activeExecutionID: UUID?
     private var cancelGeneration: (() -> Void)?
 
@@ -258,16 +260,27 @@ class FloatingPanelViewModel: ObservableObject {
     }
 
     func selectPrevious() {
-        guard processingState == .idle else { return }
-        selectedIndex = (selectedIndex - 1 + actions.count) % actions.count
+        if processingState == .completed, !followUpActions.isEmpty {
+            selectedFollowUpIndex = (selectedFollowUpIndex - 1 + followUpActions.count) % followUpActions.count
+        } else if processingState == .idle {
+            selectedIndex = (selectedIndex - 1 + actions.count) % actions.count
+        }
     }
 
     func selectNext() {
-        guard processingState == .idle else { return }
-        selectedIndex = (selectedIndex + 1) % actions.count
+        if processingState == .completed, !followUpActions.isEmpty {
+            selectedFollowUpIndex = (selectedFollowUpIndex + 1) % followUpActions.count
+        } else if processingState == .idle {
+            selectedIndex = (selectedIndex + 1) % actions.count
+        }
     }
 
     func executeSelected() {
+        // If follow-ups are showing, execute the selected follow-up
+        if processingState == .completed, !followUpActions.isEmpty, selectedFollowUpIndex < followUpActions.count {
+            executeFollowUp(followUpActions[selectedFollowUpIndex])
+            return
+        }
         guard processingState == .idle, selectedIndex < actions.count else { return }
         let action = actions[selectedIndex]
         let executionID = UUID()
@@ -328,6 +341,11 @@ class FloatingPanelViewModel: ObservableObject {
         guard processingState == .completed else { return }
         let previousResult = resultText ?? ""
 
+        // Push current action to history stack
+        if let current = executedAction {
+            actionHistory.append(current)
+        }
+
         let executionID = UUID()
         activeExecutionID = executionID
         resultText = nil
@@ -335,6 +353,7 @@ class FloatingPanelViewModel: ObservableObject {
         isGenerating = false
         executedAction = action
         followUpActions = []
+        selectedFollowUpIndex = 0
         processingState = .processing("Running \(action.title)…")
 
         // Write previous result to clipboard so the skill reads it as input
@@ -415,6 +434,8 @@ class FloatingPanelViewModel: ObservableObject {
         resultText = nil
         isResultInClipboard = false
         followUpActions = []
+        actionHistory = []
+        selectedFollowUpIndex = 0
         processingState = .idle
         selectedIndex = 0
     }
@@ -510,6 +531,26 @@ struct FloatingPanelView: View {
 
     private var executedSection: some View {
         VStack(spacing: 0) {
+            // History stack — previous actions in the pipeline
+            ForEach(Array(viewModel.actionHistory.enumerated()), id: \.offset) { _, pastAction in
+                HStack(spacing: 10) {
+                    Image(systemName: pastAction.systemImage)
+                        .font(.body)
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 20, alignment: .center)
+                    Text(pastAction.title)
+                        .font(.body)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.body)
+                        .foregroundStyle(.green.opacity(0.5))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+            }
+
+            // Current action
             if let action = viewModel.executedAction {
                 HStack(spacing: 10) {
                     Image(systemName: action.systemImage)
@@ -592,7 +633,7 @@ struct FloatingPanelView: View {
                     if !viewModel.followUpActions.isEmpty {
                         VStack(spacing: 2) {
                             ForEach(Array(viewModel.followUpActions.enumerated()), id: \.element.id) { index, action in
-                                ActionRow(action: action, isSelected: false, index: index)
+                                ActionRow(action: action, isSelected: index == viewModel.selectedFollowUpIndex, index: index)
                                     .onTapGesture {
                                         viewModel.executeFollowUp(action)
                                     }
