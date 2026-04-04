@@ -4,6 +4,7 @@ import SwiftUI
 struct MenuContentView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var settings: AppSettings
+    @ObservedObject var llmService = LocalLLMService.shared
     let updater: UpdaterProviding
 
     var body: some View {
@@ -15,6 +16,10 @@ struct MenuContentView: View {
                 .buttonStyle(.plain)
                 Divider()
             }
+
+            modelSection
+
+            Divider()
 
             Button {
                 SettingsWindowController.shared.show(
@@ -47,5 +52,35 @@ struct MenuContentView: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 10)
+    }
+
+    private var modelSection: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(downloadedModels) { def in
+                Button {
+                    settings.llmModel = def.id
+                    Task { await LocalLLMService.shared.loadModel() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: llmService.loadedModelId == def.id ? "checkmark.circle.fill" : "circle")
+                            .font(.caption)
+                            .foregroundStyle(llmService.loadedModelId == def.id ? .green : .secondary)
+                        Text(def.name)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
+            if downloadedModels.isEmpty {
+                Text("No models downloaded")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var downloadedModels: [ModelDefinition] {
+        ModelDefinition.all.filter(\.isDownloaded)
     }
 }
