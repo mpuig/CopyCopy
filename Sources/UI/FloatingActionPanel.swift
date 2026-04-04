@@ -212,7 +212,7 @@ class FloatingPanelViewModel: ObservableObject {
     @Published var isResultInClipboard: Bool = false
     @Published var isGenerating: Bool = false
     @Published var followUpActions: [SuggestedAction] = []
-    @Published var actionHistory: [SuggestedAction] = []
+    @Published var pipelineSteps: [PipelineStep] = []
     @Published var selectedFollowUpIndex: Int = 0
     private var activeExecutionID: UUID?
     private var cancelGeneration: (() -> Void)?
@@ -341,9 +341,9 @@ class FloatingPanelViewModel: ObservableObject {
         guard processingState == .completed else { return }
         let previousResult = resultText ?? ""
 
-        // Push current action to history stack
-        if let current = executedAction {
-            actionHistory.append(current)
+        // Push current action+result to pipeline history
+        if let current = executedAction, !previousResult.isEmpty {
+            pipelineSteps.append(PipelineStep(action: current, resultText: previousResult))
         }
 
         let executionID = UUID()
@@ -408,6 +408,9 @@ class FloatingPanelViewModel: ObservableObject {
         if let currentSkill = executedAction?.skillId {
             excluded.insert(currentSkill)
         }
+        for step in pipelineSteps {
+            excluded.insert(step.action.skillId)
+        }
         followUpActions = Array(matched.filter { !excluded.contains($0.skillId) }.prefix(4))
     }
 
@@ -434,11 +437,18 @@ class FloatingPanelViewModel: ObservableObject {
         resultText = nil
         isResultInClipboard = false
         followUpActions = []
-        actionHistory = []
+        pipelineSteps = []
         selectedFollowUpIndex = 0
         processingState = .idle
         selectedIndex = 0
     }
+}
+
+struct PipelineStep: Identifiable {
+    let id = UUID()
+    let action: SuggestedAction
+    let resultText: String
+    var isExpanded: Bool = false
 }
 
 enum ProcessingState: Equatable {
@@ -530,58 +540,122 @@ struct FloatingPanelView: View {
     }
 
     private var executedSection: some View {
-        VStack(spacing: 0) {
-            // History stack — previous actions in the pipeline
-            ForEach(Array(viewModel.actionHistory.enumerated()), id: \.offset) { _, pastAction in
-                HStack(spacing: 10) {
-                    Image(systemName: pastAction.systemImage)
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
-                        .frame(width: 20, alignment: .center)
-                    Text(pastAction.title)
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.body)
-                        .foregroundStyle(.green.opacity(0.5))
+        ScrollView {
+            VStack(spacing: 0) {
+                // Pipeline history: action + collapsible result pairs
+                ForEach(Array(viewModel.pipelineSteps.indices), id: \.self) { index in
+                    let step = viewModel.pipelineSteps[index]
+                    pipelineStepRow(step: step, index: index)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
+
+                // Current action
+                if let action = viewModel.executedAction {
+                    currentActionRow(action: action)
+                }
+
+                // Current result (processing or completed)
+                if viewModel.processingState != .idle {
+                    currentResultSection
+                }
+
+                // Follow-up actions
+                if viewModel.processingState == .completed {
+                    followUpSection
+                }
+            }
+        }
+        .frame(maxHeight: 500)
+    }
+
+    private func pipelineStepRow(step: PipelineStep, index: Int) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: step.action.systemImage)
+                    .font(.body)
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 20, alignment: .center)
+                Text(step.action.title)
+                    .font(.body)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.body)
+                    .foregroundStyle(.green.opacity(0.5))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                    viewModel.pipelineSteps[index].isExpanded.toggle()
+                }
             }
 
-            // Current action
-            if let action = viewModel.executedAction {
-                HStack(spacing: 10) {
-                    Image(systemName: action.systemImage)
+            if step.isExpanded {
+                Text(step.resultText)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .padding(.leading, 30)
+            }
+        }
+    }
+
+    private func currentActionRow(action: SuggestedAction) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: action.systemImage)
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .frame(width: 20, alignment: .center)
+            Text(action.title)
+                .font(.body)
+            Spacer()
+            if viewModel.isGenerating {
+                Button(action: { viewModel.stopGeneration() }) {
+                    Image(systemName: "stop.circle.fill")
                         .font(.body)
                         .foregroundStyle(.secondary)
-                        .frame(width: 20, alignment: .center)
-                    Text(action.title)
-                        .font(.body)
-                    Spacer()
-                    if viewModel.isGenerating {
-                        Button(action: { viewModel.stopGeneration() }) {
-                            Image(systemName: "stop.circle.fill")
-                                .font(.body)
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    } else if case .processing = viewModel.processingState {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else if viewModel.processingState == .completed {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.body)
-                            .foregroundStyle(.green)
-                    }
                 }
+                .buttonStyle(.plain)
+            } else if case .processing = viewModel.processingState {
+                ProgressView()
+                    .controlSize(.small)
+            } else if viewModel.processingState == .completed {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.body)
+                    .foregroundStyle(.green)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+    }
+
+    private var currentResultSection: some View {
+        VStack(spacing: 0) {
+            if case .processing(let message) = viewModel.processingState {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(message)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
-            }
+            } else if let text = viewModel.resultText, !text.isEmpty {
+                Text(text)
+                    .font(.callout)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .padding(.leading, 20)
 
-            if viewModel.processingState != .idle {
-                if viewModel.processingState == .completed, viewModel.isResultInClipboard, !viewModel.isGenerating {
+                // Copied to clipboard — below the result
+                if viewModel.isResultInClipboard, !viewModel.isGenerating {
                     HStack(spacing: 10) {
                         Image(systemName: "doc.on.clipboard")
                             .font(.body)
@@ -597,68 +671,43 @@ struct FloatingPanelView: View {
                             .background(.white.opacity(0.08))
                             .cornerRadius(4)
                             .foregroundStyle(.tertiary)
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.body)
-                            .foregroundStyle(.green)
                     }
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 6)
                 }
+            }
+        }
+    }
 
-                if case .processing(let message) = viewModel.processingState {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(message)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                } else if let text = viewModel.resultText, !text.isEmpty {
-                    ScrollView {
-                        Text(text)
-                            .font(.callout)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(5)
-                    }
-                    .frame(maxHeight: 420)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                }
-
-                if viewModel.processingState == .completed {
-                    if !viewModel.followUpActions.isEmpty {
-                        VStack(spacing: 2) {
-                            ForEach(Array(viewModel.followUpActions.enumerated()), id: \.element.id) { index, action in
-                                ActionRow(action: action, isSelected: index == viewModel.selectedFollowUpIndex, index: index)
-                                    .onTapGesture {
-                                        viewModel.executeFollowUp(action)
-                                    }
+    private var followUpSection: some View {
+        VStack(spacing: 0) {
+            if !viewModel.followUpActions.isEmpty {
+                VStack(spacing: 2) {
+                    ForEach(Array(viewModel.followUpActions.enumerated()), id: \.element.id) { index, action in
+                        ActionRow(action: action, isSelected: index == viewModel.selectedFollowUpIndex, index: index)
+                            .onTapGesture {
+                                viewModel.executeFollowUp(action)
                             }
-                        }
-                        .padding(.vertical, 2)
-                    }
-
-                    HStack(spacing: 10) {
-                        Image(systemName: "chevron.left")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 20, alignment: .center)
-                        Text("Back")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        viewModel.resetToActions()
                     }
                 }
+                .padding(.vertical, 2)
+            }
+
+            HStack(spacing: 10) {
+                Image(systemName: "chevron.left")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20, alignment: .center)
+                Text("Back")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                viewModel.resetToActions()
             }
         }
     }
