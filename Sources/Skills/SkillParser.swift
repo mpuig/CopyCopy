@@ -257,6 +257,7 @@ enum SkillParser {
         "revealPath": "path",
         "openInTerminal": "path",
         "ping": "host",
+        "fetchURL": "url",
     ]
 
     private static func buildToolCallParameters(_ call: ToolCall) throws -> (execute: String, parameters: ToolParameters) {

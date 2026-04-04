@@ -3,6 +3,7 @@ import Foundation
 enum BuiltInSkills {
     static let all: [(id: String, content: String)] = [
         ("open-url", openURL),
+        ("read-article", readArticle),
         ("search-web", searchWeb),
         ("clean-text", cleanText),
         ("html-to-markdown", htmlToMarkdown),
@@ -33,6 +34,19 @@ content-types: url
 ---
 
 openURL({clipboardURL})
+"""
+
+    static let readArticle = """
+---
+name: Read Article
+description: Fetch URL and extract clean article as Markdown
+icon: doc.text
+content-types: url
+source-boosts:
+  browser: 100
+---
+
+fetchURL({clipboardURL})
 """
 
     static let searchWeb = """

@@ -21,6 +21,7 @@ enum ExecuteFunction: String, CaseIterable {
     case llmAgent
     case summarize
     case openStaticURL
+    case fetchURL
 
     var displayName: String {
         switch self {
@@ -44,6 +45,7 @@ enum ExecuteFunction: String, CaseIterable {
         case .llmAgent: return "AI Agent"
         case .summarize: return "Summarize"
         case .openStaticURL: return "Open URL"
+        case .fetchURL: return "Fetch URL"
         }
     }
 }

@@ -186,6 +186,11 @@ final class ToolExecutor {
                 let url = try ToolValidator.validateOpenableURL(urlString)
                 NSWorkspace.shared.open(url)
                 completion("Opened URL", false)
+
+            case .fetchURL:
+                let urlString = try requiredText(parameters["url"] ?? primaryText(from: context))
+                let url = try ToolValidator.validateOpenableURL(urlString)
+                executeFetchURL(url: url, completion: completion)
             }
             return nil
         } catch {
@@ -628,6 +633,65 @@ final class ToolExecutor {
                 }
             } catch {
                 Logger.error("HTML to Markdown conversion failed: \(error)", category: .actions)
+                await MainActor.run {
+                    completion("Failed: \(error.localizedDescription)", false)
+                }
+            }
+        }
+    }
+
+    private func executeFetchURL(
+        url: URL,
+        completion: @escaping ActionCompletion
+    ) {
+        Task.detached {
+            do {
+                var request = URLRequest(url: url)
+                request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+                request.timeoutInterval = 15
+
+                let (data, response) = try await URLSession.shared.data(for: request)
+
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    await MainActor.run {
+                        completion("Failed: Could not fetch URL (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0))", false)
+                    }
+                    return
+                }
+
+                guard let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii) else {
+                    await MainActor.run {
+                        completion("Failed: Could not decode response", false)
+                    }
+                    return
+                }
+
+                let markdown = try await HTMLMarkdownConverter.convertAsync(html)
+                let metadata = try? ContentExtractor.extractMainContent(from: html).metadata
+                var result = ""
+
+                if let title = metadata?.title, !title.isEmpty {
+                    result += "# \(title)\n\n"
+                }
+                if let author = metadata?.author, !author.isEmpty {
+                    result += "**Author:** \(author)\n"
+                }
+                if let published = metadata?.published, !published.isEmpty {
+                    result += "**Published:** \(published)\n"
+                }
+                if !result.isEmpty, let source = url.absoluteString as String? {
+                    result += "**Source:** \(source)\n\n---\n\n"
+                }
+
+                result += markdown
+
+                await MainActor.run {
+                    self.copyToClipboard(result)
+                    completion(result, true)
+                }
+            } catch {
+                Logger.error("Fetch URL failed: \(error)", category: .actions)
                 await MainActor.run {
                     completion("Failed: \(error.localizedDescription)", false)
                 }
