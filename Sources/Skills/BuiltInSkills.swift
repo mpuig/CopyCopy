@@ -2,21 +2,21 @@ import Foundation
 
 enum BuiltInSkills {
     static let all: [(id: String, content: String)] = [
-        ("open-url", openURL),
+        // URL
         ("read-article", readArticle),
-        ("search-web", searchWeb),
+        // Text cleanup
         ("clean-text", cleanText),
         ("html-to-markdown", htmlToMarkdown),
+        // AI writing
         ("fix-grammar", fixGrammar),
-        ("make-concise", makeConcise),
         ("summarize", summarize),
         ("translate", translate),
+        // AI contextual
         ("draft-chat-reply", draftChatReply),
         ("rewrite-email", rewriteEmail),
         ("extract-action-items", extractActionItems),
         ("explain-code", explainCode),
-        ("extract-data", extractData),
-        ("open-in-maps", openInMaps),
+        // Files
         ("open-file", openFile),
         ("reveal-in-finder", revealInFinder),
         ("reveal-path", revealPath),
