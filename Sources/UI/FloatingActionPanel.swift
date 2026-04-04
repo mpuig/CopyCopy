@@ -33,14 +33,11 @@ class FloatingActionPanel: NSPanel {
     private func setupWindow() {
         isFloatingPanel = true
         level = .popUpMenu
+        isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        hasShadow = false
         isMovableByWindowBackground = true
         collectionBehavior = [.canJoinAllSpaces, .ignoresCycle]
-
-        contentView?.wantsLayer = true
-        contentView?.layer?.cornerRadius = 12
-        contentView?.layer?.masksToBounds = true
     }
 
     private func setupContent() {
@@ -346,39 +343,41 @@ struct FloatingPanelView: View {
         VStack(spacing: 0) {
             headerSection
 
-            Divider()
-
             if viewModel.executedAction != nil {
                 executedSection
             } else {
                 actionsSection
             }
         }
-        .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(12)
-        .shadow(radius: 20)
-        .animation(.easeInOut(duration: 0.2), value: viewModel.executedAction != nil)
+        .padding(6)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.25), radius: 24, x: 0, y: 8)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.executedAction != nil)
     }
 
     private var headerSection: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Image(systemName: viewModel.contentTypeIcon)
-                .font(.body)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .frame(width: 20, alignment: .center)
             Text(viewModel.contentTypeDescription)
-                .font(.body)
-                .fontWeight(.medium)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             Spacer()
             if viewModel.processingState == .idle, !viewModel.actions.isEmpty {
-                Text("↑↓")
+                Text("↑↓ ↵")
                     .font(.caption2)
                     .foregroundStyle(.quaternary)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color(NSColor.textBackgroundColor).opacity(0.5))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 
     private var actionsSection: some View {
@@ -398,25 +397,24 @@ struct FloatingPanelView: View {
                         }
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 2)
             }
             .onChange(of: viewModel.selectedIndex) { newIndex in
-                withAnimation {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
                     proxy.scrollTo(newIndex, anchor: .center)
                 }
             }
         }
-        .frame(maxHeight: 200)
+        .frame(maxHeight: 240)
     }
 
     private var executedSection: some View {
         VStack(spacing: 0) {
             if let action = viewModel.executedAction {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Image(systemName: action.systemImage)
-                        .font(.body)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .frame(width: 20, alignment: .center)
                     Text(action.title)
                         .font(.body)
                         .fontWeight(.medium)
@@ -437,13 +435,11 @@ struct FloatingPanelView: View {
                             .foregroundStyle(.green)
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
             }
 
             if viewModel.processingState != .idle {
-                Divider()
-
                 VStack(alignment: .leading, spacing: 8) {
                     if viewModel.processingState == .completed, viewModel.isResultInClipboard, !viewModel.isGenerating {
                         HStack(spacing: 6) {
@@ -454,10 +450,10 @@ struct FloatingPanelView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Text("⌘V")
-                                .font(.caption)
+                                .font(.caption2)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
-                                .background(Color(NSColor.separatorColor).opacity(0.3))
+                                .background(.white.opacity(0.08))
                                 .cornerRadius(3)
                                 .foregroundStyle(.tertiary)
                         }
@@ -468,7 +464,7 @@ struct FloatingPanelView: View {
                             ProgressView()
                                 .controlSize(.small)
                             Text(message)
-                                .font(.caption)
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -483,8 +479,8 @@ struct FloatingPanelView: View {
                         .frame(maxHeight: 420)
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
             }
         }
     }
@@ -494,13 +490,14 @@ struct ActionRow: View {
     let action: SuggestedAction
     let isSelected: Bool
     let index: Int
+    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: action.systemImage)
                 .font(.body)
                 .foregroundStyle(isSelected ? .white : .secondary)
-                .frame(width: 20, alignment: .center)
+                .frame(width: 22, alignment: .center)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(action.title)
@@ -521,10 +518,18 @@ struct ActionRow: View {
                     .foregroundStyle(.white.opacity(0.6))
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(isSelected ? Color.accentColor : Color.clear)
-        .cornerRadius(8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Color.accentColor : (isHovered ? Color.white.opacity(0.08) : Color.clear))
+        )
+        .scaleEffect(isSelected ? 1.0 : (isHovered ? 1.01 : 1.0))
+        .animation(.spring(response: 0.25, dampingFraction: 0.9), value: isSelected)
+        .animation(.spring(response: 0.25, dampingFraction: 0.9), value: isHovered)
         .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
