@@ -6,14 +6,14 @@ CopyCopy is a macOS menu bar app that understands what you copy and offers the r
 
 ## Features
 
-- **On-device AI actions** — Summarize, translate, rewrite emails and Slack messages, fix grammar, and more using the local LFM 2.5 model. No API keys, no data sent anywhere.
-- **Smart content detection** — Recognizes URLs, JSON, Base64, file paths, code snippets, addresses, foreign languages, and 20+ other content types.
-- **Source-aware ranking** — Knows whether you copied from an email client, chat app, browser, IDE, or terminal, and surfaces the most relevant action first.
-- **HTML to Markdown** — Defuddle-style content extraction converts web pages to clean Markdown, preserving code blocks, callouts, and structure.
-- **Instant local transforms** — Format JSON, decode Base64/URL encoding, strip ANSI codes, and convert text case without touching the network.
-- **Extensible skills** — Create custom `SKILL.md` files in `~/.copycopy/skills/` to add your own actions.
+- **On-device AI** — Summarize, translate, rewrite, explain code, and more using local GGUF models with Metal GPU acceleration. No API keys, no cloud.
+- **Pipeline actions** — Chain multiple steps: convert HTML → Markdown → Summarize → Translate. Each result feeds the next action with contextual follow-ups.
+- **Smart content detection** — Recognizes URLs, code snippets, file paths, foreign languages, email drafts, and 20+ content types.
+- **Source-aware ranking** — Surfaces the most relevant action based on whether you copied from email, chat, browser, IDE, or terminal. Learns from your choices.
+- **Multiple models** — Choose from LFM, Gemma 4, or Qwen models. Download and switch from the menu bar.
+- **Extensible skills** — Create custom `SKILL.md` files in `~/.copycopy/skills/` to add your own actions or override built-ins.
 - **Double-⌘C trigger** — Configurable threshold. No always-on popup or clipboard history.
-- **Privacy first** — No telemetry, no clipboard history, no tracking. The default AI path is on-device.
+- **Privacy first** — No telemetry, no clipboard history, no network calls. Everything runs on your Mac.
 
 ## Requirements
 

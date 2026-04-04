@@ -103,6 +103,16 @@ Rules:
 - Categories: `terminal`, `ide`, `browser`, `email`, `chat`, `notes`, `other`
 - Bundle ID lists in `TerminalAppIdentifiers.swift`
 
+### Pipeline UI
+
+After a skill executes, contextual follow-up actions appear below the result. The result becomes the input for the next action, enabling multi-step workflows:
+
+```
+Copy HTML → Smart Markdown → Summarize → Translate
+```
+
+Follow-ups are determined by re-running `SkillLoader.matchingActions()` on a synthetic `ClipboardContext` built from the result text. File/URL skills and the skill that just ran are excluded. Max 4 follow-ups shown. "Back" resets to the original clipboard actions.
+
 ### Usage history
 
 `UsageHistory` tracks which skills users pick per (skillId, contentKind, sourceContext) tuple. Stored in `~/.copycopy/usage-history.json`. Frequently used skills get boosted in ranking (up to +50 after 5 uses).
