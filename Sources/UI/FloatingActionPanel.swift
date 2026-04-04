@@ -483,10 +483,11 @@ struct FloatingPanelView: View {
                             .font(.callout)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(5)
                     }
                     .frame(maxHeight: 420)
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 4)
                 }
             }
         }
