@@ -2,6 +2,21 @@ import Cocoa
 import NaturalLanguage
 
 final class ClipboardClassifier {
+    // Pre-compiled regex patterns for entity detection
+    private static let emailRegex = try! NSRegularExpression(pattern: #"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"#)
+    private static let hexColorRegex = try! NSRegularExpression(pattern: #"^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$"#)
+    private static let rgbRegex = try! NSRegularExpression(pattern: #"^rgba?\s*\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(\s*,\s*[\d.]+)?\s*\)$"#)
+    private static let uuidRegex = try! NSRegularExpression(pattern: #"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"#)
+    private static let ipv4Regex = try! NSRegularExpression(pattern: #"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$"#)
+    private static let gitShaRegex = try! NSRegularExpression(pattern: #"^[0-9a-f]{7,40}$"#)
+    private static let coordRegex = try! NSRegularExpression(pattern: #"^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$"#)
+    private static let hashtagRegex = try! NSRegularExpression(pattern: #"^#[A-Za-z][A-Za-z0-9_]*$"#)
+    private static let mentionRegex = try! NSRegularExpression(pattern: #"^@[A-Za-z][A-Za-z0-9_]*$"#)
+    private static let currencyRegex = try! NSRegularExpression(pattern: #"^[\$€£¥]\s?[\d,]+(\.\d{2})?$|^[\d,]+(\.\d{2})?\s?[\$€£¥]$"#)
+    private static let filePathRegex = try! NSRegularExpression(pattern: #"^(~(/[^/]+)*)/?$|^/([^/]+/)*[^/]+/?$"#)
+    private static let base64Regex = try! NSRegularExpression(pattern: #"^[A-Za-z0-9+/]+=*$"#)
+    private static let postalCodeRegex = try! NSRegularExpression(pattern: #"\b\d{5}\b"#)
+    private static let provinceParensRegex = try! NSRegularExpression(pattern: #"\([a-z][^)]{1,40}\)"#)
     func snapshot(from pasteboard: NSPasteboard, changeCount: Int) -> ClipboardSnapshot {
         let html = readHTML(from: pasteboard)
         let htmlPreference = html.map(classifyHTMLPreference)
@@ -337,7 +352,7 @@ final class ClipboardClassifier {
         ]
 
         let hasAddressKeyword = iberianAddressKeywords.contains { normalized.contains($0) }
-        let hasPostalCode = matches(normalized, pattern: #"\b\d{5}\b"#)
+        let hasPostalCode = matches(normalized, regex: Self.postalCodeRegex)
         let hasProvinceInParens = matches(normalized, pattern: #"\([a-z][^)]{1,40}\)"#)
         let commaSegments = trimmed
             .split(separator: ",")
@@ -360,31 +375,31 @@ final class ClipboardClassifier {
 
         // Email
         let emailPattern = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
-        if matches(trimmed, pattern: emailPattern) {
+        if matches(trimmed, regex: Self.emailRegex) {
             return .email
         }
 
         // Hex color (#RGB, #RRGGBB, #RRGGBBAA)
         let hexColorPattern = "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$"
-        if matches(trimmed, pattern: hexColorPattern) {
+        if matches(trimmed, regex: Self.hexColorRegex) {
             return .hexColor
         }
 
         // RGB/RGBA color
         let rgbPattern = "^rgba?\\s*\\(\\s*\\d{1,3}\\s*,\\s*\\d{1,3}\\s*,\\s*\\d{1,3}(\\s*,\\s*[\\d.]+)?\\s*\\)$"
-        if matches(trimmed.lowercased(), pattern: rgbPattern) {
+        if matches(trimmed.lowercased(), regex: Self.rgbRegex) {
             return .hexColor
         }
 
         // UUID
         let uuidPattern = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-        if matches(trimmed, pattern: uuidPattern) {
+        if matches(trimmed, regex: Self.uuidRegex) {
             return .uuid
         }
 
         // IP Address (IPv4)
         let ipPattern = "^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
-        if matches(trimmed, pattern: ipPattern) {
+        if matches(trimmed, regex: Self.ipv4Regex) {
             return .ipAddress
         }
 
@@ -396,37 +411,37 @@ final class ClipboardClassifier {
 
         // Git SHA (7-40 hex chars)
         let gitShaPattern = "^[0-9a-f]{7,40}$"
-        if matches(trimmed.lowercased(), pattern: gitShaPattern) && !trimmed.contains(" ") {
+        if matches(trimmed.lowercased(), regex: Self.gitShaRegex) && !trimmed.contains(" ") {
             return .gitSha
         }
 
         // Coordinates (lat, long)
         let coordPattern = "^-?\\d{1,3}\\.\\d+\\s*,\\s*-?\\d{1,3}\\.\\d+$"
-        if matches(trimmed, pattern: coordPattern) {
+        if matches(trimmed, regex: Self.coordRegex) {
             return .coordinates
         }
 
         // Hashtag
         let hashtagPattern = "^#[A-Za-z][A-Za-z0-9_]*$"
-        if matches(trimmed, pattern: hashtagPattern) {
+        if matches(trimmed, regex: Self.hashtagRegex) {
             return .hashtag
         }
 
         // Mention (@username)
         let mentionPattern = "^@[A-Za-z][A-Za-z0-9_]*$"
-        if matches(trimmed, pattern: mentionPattern) {
+        if matches(trimmed, regex: Self.mentionRegex) {
             return .mention
         }
 
         // Currency ($100, €50, £30, ¥1000)
         let currencyPattern = "^[\\$€£¥]\\s?[\\d,]+(\\.\\d{2})?$|^[\\d,]+(\\.\\d{2})?\\s?[\\$€£¥]$"
-        if matches(trimmed, pattern: currencyPattern) {
+        if matches(trimmed, regex: Self.currencyRegex) {
             return .currency
         }
 
         // File path (Unix style)
         let filePathPattern = "^(~(/[^/]+)*)/?$|^/([^/]+/)*[^/]+/?$"
-        if matches(trimmed, pattern: filePathPattern) {
+        if matches(trimmed, regex: Self.filePathRegex) {
             return .filePath
         }
 
@@ -555,12 +570,16 @@ final class ClipboardClassifier {
         return nil
     }
 
+    private func matches(_ text: String, regex: NSRegularExpression) -> Bool {
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.firstMatch(in: text, options: [], range: range) != nil
+    }
+
     private func matches(_ text: String, pattern: String) -> Bool {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
             return false
         }
-        let range = NSRange(text.startIndex..., in: text)
-        return regex.firstMatch(in: text, options: [], range: range) != nil
+        return matches(text, regex: regex)
     }
 }
 

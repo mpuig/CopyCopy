@@ -417,7 +417,7 @@ struct FloatingPanelView: View {
                 }
                 .padding(.vertical, 2)
             }
-            .onChange(of: viewModel.selectedIndex) { newIndex in
+            .onChange(of: viewModel.selectedIndex) { _, newIndex in
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
                     proxy.scrollTo(newIndex, anchor: .center)
                 }
