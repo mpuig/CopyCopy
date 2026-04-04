@@ -444,21 +444,27 @@ struct FloatingPanelView: View {
             if viewModel.processingState != .idle {
                 VStack(alignment: .leading, spacing: 8) {
                     if viewModel.processingState == .completed, viewModel.isResultInClipboard, !viewModel.isGenerating {
-                        HStack(spacing: 6) {
-                            Image(systemName: "doc.on.clipboard.fill")
-                                .font(.caption)
-                                .foregroundStyle(.green)
-                            Text("Copied to clipboard")
-                                .font(.caption)
+                        HStack(spacing: 10) {
+                            Image(systemName: "doc.on.clipboard")
+                                .font(.body)
                                 .foregroundStyle(.secondary)
+                                .frame(width: 20, alignment: .center)
+                            Text("Copied to clipboard")
+                                .font(.body)
+                            Spacer()
                             Text("⌘V")
-                                .font(.caption2)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
+                                .font(.caption)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
                                 .background(.white.opacity(0.08))
-                                .cornerRadius(3)
+                                .cornerRadius(4)
                                 .foregroundStyle(.tertiary)
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.body)
+                                .foregroundStyle(.green)
                         }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
                     }
 
                     if case .processing(let message) = viewModel.processingState {
