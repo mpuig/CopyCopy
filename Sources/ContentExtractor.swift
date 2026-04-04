@@ -46,19 +46,13 @@ enum ContentExtractor {
     private static let removableSelectors = [
         "script", "style", "noscript", "svg", "canvas", "iframe",
         "form", "dialog", "button", "select", "textarea",
-        "nav", "[role='navigation']", "[role='banner']", "[role='complementary']",
-        "[data-testid='sidebarColumn']", "[data-testid='DMDrawer']",
-        "[data-testid='TopNavBar']", "[data-testid='BottomBar']",
-        "[aria-label='Keyboard shortcuts']"
+        "nav", "header:not(:has(h1))", "footer",
+        "[role='navigation']", "[role='banner']", "[role='complementary']",
+        "[role='search']", "[role='menubar']", "[role='toolbar']",
+        "[aria-hidden='true']"
     ]
 
     private static let entryPointSelectors: [(selector: String, boost: Double)] = [
-        // SPA-specific high-priority selectors
-        ("[data-testid='primaryColumn']", 44),
-        ("[data-testid='tweetText']", 42),
-        ("[data-testid='tweet']", 42),
-        ("[data-testid='cellInnerDiv']", 38),
-        // Standard semantic selectors
         ("article", 40),
         ("[role='article']", 36),
         ("main", 34),
@@ -88,17 +82,14 @@ enum ContentExtractor {
         "footer", "header", "hero", "menu", "modal", "nav", "newsletter",
         "pagination", "popup", "promo", "recommend", "related", "share",
         "sidebar", "social", "sponsor", "subscribe", "toolbar", "widget",
-        "trending", "discover", "explore", "topbar", "bottombar", "drawer",
-        "suggestions", "who-to-follow", "relevant-people", "profile-card"
+        "trending", "drawer", "toast", "snackbar", "overlay", "tooltip"
     ]
 
     private static let negativeTextPatterns = [
         "all rights reserved", "cookie policy", "follow us", "more articles",
         "newsletter", "privacy policy", "related posts", "share this", "sign up",
-        "subscribe", "terms of service", "trending", "what's happening",
-        "who to follow", "relevant people", "discover more", "show more",
-        "view keyboard shortcuts", "keyboard shortcuts", "skip to main content",
-        "accessibility", "ads info"
+        "subscribe", "terms of service", "skip to main content", "keyboard shortcuts",
+        "accept cookies", "manage cookies", "do not sell"
     ]
 
     private static let socialLinkDomains = [
