@@ -6,14 +6,14 @@
     <title>CopyCopy — Smart clipboard actions for macOS</title>
     <meta
       name="description"
-      content="Double-press ⌘C to rewrite emails, summarize articles, format JSON, and more. On-device AI, nothing leaves your Mac."
+      content="Double-press ⌘C to summarize, translate, rewrite, explain code, and more. On-device AI, nothing leaves your Mac."
     />
     <link rel="canonical" href="https://copycopy.app/" />
 
     <meta property="og:title" content="CopyCopy" />
     <meta
       property="og:description"
-      content="Double-press ⌘C to rewrite emails, summarize articles, format JSON, and more. On-device AI, nothing leaves your Mac."
+      content="Double-press ⌘C to summarize, translate, rewrite, explain code, and more. On-device AI, nothing leaves your Mac."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://copycopy.app/" />
@@ -45,7 +45,7 @@
           Copy anything.<br>Get the smart action.
         </h1>
         <p class="hero__subtitle animate-in animate-in--delay-2">
-          CopyCopy understands what you copy and where you copied it from, then offers the right action — rewrite, summarize, format, translate — all on-device.
+          CopyCopy understands what you copy and where you copied it from, then offers the right action — summarize, translate, rewrite, explain code — all on-device.
         </p>
         <div class="hero__actions animate-in animate-in--delay-3">
           <a class="btn btn--primary" href="https://github.com/mpuig/copycopy/releases/latest">Download</a>
@@ -64,9 +64,9 @@
           <ul class="problem__list">
             <li class="problem__item">Paste from a webpage and manually clean the formatting</li>
             <li class="problem__item">Open Google Translate in a separate tab</li>
-            <li class="problem__item">Switch to a JSON formatter to make it readable</li>
             <li class="problem__item">Rewrite that email draft one more time before sending</li>
-            <li class="problem__item">Strip terminal color codes before sharing output</li>
+            <li class="problem__item">Read a long article and wish someone would summarize it</li>
+            <li class="problem__item">Copy code and wonder what it does</li>
           </ul>
         </div>
       </section>
@@ -89,7 +89,7 @@
             <div class="step">
               <div class="step__number">3</div>
               <p class="step__title">Pick an action</p>
-              <p class="step__desc">Choose from context-aware suggestions. The result lands in your clipboard.</p>
+              <p class="step__desc">Choose from context-aware suggestions. Results stream in real time.</p>
             </div>
           </div>
         </div>
@@ -107,7 +107,7 @@
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
               CopyCopy suggests
             </div>
-            <div class="scenario__action">Rewrite Email Draft</div>
+            <div class="scenario__action">Rewrite Email</div>
           </div>
 
           <div class="scenario">
@@ -117,27 +117,17 @@
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
               CopyCopy suggests
             </div>
-            <div class="scenario__action">HTML to Markdown</div>
+            <div class="scenario__action">Smart Markdown</div>
           </div>
 
           <div class="scenario">
             <span class="scenario__source">Copied from VS Code</span>
-            <div class="scenario__content">{"users":[{"id":1,"name":"Alice","role":"admin"},{"id":2...</div>
+            <div class="scenario__content">async function fetchUser(id) { const res = await fetch(`/api/users/${id}`)...</div>
             <div class="scenario__arrow">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
               CopyCopy suggests
             </div>
-            <div class="scenario__action">Pretty Print JSON</div>
-          </div>
-
-          <div class="scenario">
-            <span class="scenario__source">Copied from Terminal</span>
-            <div class="scenario__content"><span style="opacity: 0.6">[0;32m</span>PASS<span style="opacity: 0.6">[0m</span> tests/auth.test.ts (2.41s) ✓ validates token...</div>
-            <div class="scenario__arrow">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
-              CopyCopy suggests
-            </div>
-            <div class="scenario__action">Strip ANSI Codes</div>
+            <div class="scenario__action">Explain Code</div>
           </div>
 
           <div class="scenario">
@@ -147,7 +137,7 @@
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
               CopyCopy suggests
             </div>
-            <div class="scenario__action">Summarize Content</div>
+            <div class="scenario__action">Summarize</div>
           </div>
 
           <div class="scenario">
@@ -160,6 +150,16 @@
             <div class="scenario__action">Translate</div>
           </div>
 
+          <div class="scenario">
+            <span class="scenario__source">Copied a URL</span>
+            <div class="scenario__content">https://example.com/blog/how-to-build-ai-agents-from-scratch</div>
+            <div class="scenario__arrow">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+              CopyCopy suggests
+            </div>
+            <div class="scenario__action">Read Article</div>
+          </div>
+
         </div>
       </section>
 
@@ -170,32 +170,32 @@
 
           <div class="feature">
             <p class="feature__title">On-device AI</p>
-            <p class="feature__desc">Summarize, translate, rewrite, and fix grammar using the local LFM 2.5 model. No API keys. No cloud calls.</p>
+            <p class="feature__desc">Summarize, translate, rewrite, and explain code using local GGUF models with Metal GPU acceleration. No API keys, no cloud.</p>
           </div>
 
           <div class="feature">
             <p class="feature__title">Source-aware</p>
-            <p class="feature__desc">Detects if you copied from email, chat, browser, IDE, or terminal — and ranks actions accordingly.</p>
+            <p class="feature__desc">Detects if you copied from email, chat, browser, IDE, or terminal — and ranks actions accordingly. Learns from your choices.</p>
           </div>
 
           <div class="feature">
-            <p class="feature__title">Instant transforms</p>
-            <p class="feature__desc">Format JSON, decode Base64, strip ANSI, convert HTML to Markdown. No network, no waiting.</p>
+            <p class="feature__title">Smart Markdown</p>
+            <p class="feature__desc">Converts HTML from any webpage to clean Markdown. AI strips remaining navigation, sidebars, and junk.</p>
           </div>
 
           <div class="feature">
-            <p class="feature__title">Content extraction</p>
-            <p class="feature__desc">Strips ads, navigation, and boilerplate from web pages before converting. Clean Markdown every time.</p>
+            <p class="feature__title">Multiple models</p>
+            <p class="feature__desc">Choose from LFM, Gemma, or Qwen models. Download from the menu bar. Switch instantly.</p>
           </div>
 
           <div class="feature">
             <p class="feature__title">Extensible</p>
-            <p class="feature__desc">Create custom SKILL.md files with your own prompt actions or URL templates. Override any built-in.</p>
+            <p class="feature__desc">Create custom SKILL.md files with your own prompts or tool calls. Override any built-in skill.</p>
           </div>
 
           <div class="feature">
             <p class="feature__title">Native & lightweight</p>
-            <p class="feature__desc">SwiftUI menu bar app. Under 15 MB. No Electron, no web views, no background daemon.</p>
+            <p class="feature__desc">SwiftUI menu bar app with frosted glass UI. No Electron, no web views, no background daemon.</p>
           </div>
 
         </div>
