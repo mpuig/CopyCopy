@@ -63,6 +63,8 @@ class FloatingActionPanel: NSPanel {
             if event.keyCode == 53 {
                 if self.contentViewModel.isGenerating {
                     self.contentViewModel.stopGeneration()
+                } else if self.contentViewModel.executedAction != nil {
+                    self.contentViewModel.resetToActions()
                 } else {
                     self.close()
                 }
@@ -170,6 +172,8 @@ class FloatingActionPanel: NSPanel {
         case 53:
             if contentViewModel.isGenerating {
                 contentViewModel.stopGeneration()
+            } else if contentViewModel.executedAction != nil {
+                contentViewModel.resetToActions()
             } else {
                 close()
             }
@@ -319,6 +323,18 @@ class FloatingPanelViewModel: ObservableObject {
             isResultInClipboard = true
         }
         processingState = .completed
+    }
+
+    func resetToActions() {
+        stopGeneration()
+        activeExecutionID = nil
+        cancelGeneration = nil
+        isGenerating = false
+        executedAction = nil
+        resultText = nil
+        isResultInClipboard = false
+        processingState = .idle
+        selectedIndex = 0
     }
 }
 
@@ -488,6 +504,29 @@ struct FloatingPanelView: View {
                     .frame(maxHeight: 420)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
+                }
+
+                if viewModel.processingState == .completed {
+                    HStack(spacing: 10) {
+                        Image(systemName: "chevron.left")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20, alignment: .center)
+                        Text("Back")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.clear)
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        viewModel.resetToActions()
+                    }
                 }
             }
         }
