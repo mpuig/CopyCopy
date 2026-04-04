@@ -442,53 +442,52 @@ struct FloatingPanelView: View {
             }
 
             if viewModel.processingState != .idle {
-                VStack(alignment: .leading, spacing: 8) {
-                    if viewModel.processingState == .completed, viewModel.isResultInClipboard, !viewModel.isGenerating {
-                        HStack(spacing: 10) {
-                            Image(systemName: "doc.on.clipboard")
-                                .font(.body)
-                                .foregroundStyle(.secondary)
-                                .frame(width: 20, alignment: .center)
-                            Text("Copied to clipboard")
-                                .font(.body)
-                            Spacer()
-                            Text("⌘V")
-                                .font(.caption)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2)
-                                .background(.white.opacity(0.08))
-                                .cornerRadius(4)
-                                .foregroundStyle(.tertiary)
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.body)
-                                .foregroundStyle(.green)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
+                if viewModel.processingState == .completed, viewModel.isResultInClipboard, !viewModel.isGenerating {
+                    HStack(spacing: 10) {
+                        Image(systemName: "doc.on.clipboard")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20, alignment: .center)
+                        Text("Copied to clipboard")
+                            .font(.body)
+                        Spacer()
+                        Text("⌘V")
+                            .font(.caption)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(.white.opacity(0.08))
+                            .cornerRadius(4)
+                            .foregroundStyle(.tertiary)
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.body)
+                            .foregroundStyle(.green)
                     }
-
-                    if case .processing(let message) = viewModel.processingState {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text(message)
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 6)
-                    } else if let text = viewModel.resultText, !text.isEmpty {
-                        ScrollView {
-                            Text(text)
-                                .font(.callout)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(maxHeight: 420)
-                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
+
+                if case .processing(let message) = viewModel.processingState {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(message)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                } else if let text = viewModel.resultText, !text.isEmpty {
+                    ScrollView {
+                        Text(text)
+                            .font(.callout)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 420)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                }
             }
         }
     }
