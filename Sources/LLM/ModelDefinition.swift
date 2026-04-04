@@ -57,7 +57,7 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             repo: "unsloth/Qwen3.5-0.8B-GGUF",
             filename: "Qwen3.5-0.8B-Q8_0.gguf",
             sizeLabel: "~0.8 GB",
-            chatTemplate: .chatml,
+            chatTemplate: .qwen,
             defaultTemperature: 0.7
         ),
         ModelDefinition(
@@ -66,7 +66,7 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             repo: "unsloth/Qwen3.5-2B-GGUF",
             filename: "Qwen3.5-2B-Q8_0.gguf",
             sizeLabel: "~2 GB",
-            chatTemplate: .chatml,
+            chatTemplate: .qwen,
             defaultTemperature: 0.7
         ),
     ]
@@ -82,11 +82,14 @@ enum ChatTemplate: Equatable, Hashable {
     case lfm
     case gemma
     case chatml
+    case qwen
 
     func format(systemPrompt: String, userPrompt: String) -> String {
         switch self {
         case .lfm, .chatml:
             return "<|im_start|>system\n\(systemPrompt)<|im_end|>\n<|im_start|>user\n\(userPrompt)<|im_end|>\n<|im_start|>assistant\n"
+        case .qwen:
+            return "<|im_start|>system\n\(systemPrompt)<|im_end|>\n<|im_start|>user\n\(userPrompt)<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
         case .gemma:
             return "<|turn>system\n\(systemPrompt)<turn|>\n<|turn>user\n\(userPrompt)<turn|>\n<|turn>model\n"
         }
