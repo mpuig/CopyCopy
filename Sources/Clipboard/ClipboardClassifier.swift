@@ -17,6 +17,7 @@ final class ClipboardClassifier {
     private static let base64Regex = try! NSRegularExpression(pattern: #"^[A-Za-z0-9+/]+=*$"#)
     private static let postalCodeRegex = try! NSRegularExpression(pattern: #"\b\d{5}\b"#)
     private static let provinceParensRegex = try! NSRegularExpression(pattern: #"\([a-z][^)]{1,40}\)"#)
+    private static let urlEncodedRegex = try! NSRegularExpression(pattern: #"(%[0-9A-Fa-f]{2})+"#)
     func snapshot(from pasteboard: NSPasteboard, changeCount: Int) -> ClipboardSnapshot {
         let html = readHTML(from: pasteboard)
         let htmlPreference = html.map(classifyHTMLPreference)
@@ -353,7 +354,7 @@ final class ClipboardClassifier {
 
         let hasAddressKeyword = iberianAddressKeywords.contains { normalized.contains($0) }
         let hasPostalCode = matches(normalized, regex: Self.postalCodeRegex)
-        let hasProvinceInParens = matches(normalized, pattern: #"\([a-z][^)]{1,40}\)"#)
+        let hasProvinceInParens = matches(normalized, regex: Self.provinceParensRegex)
         let commaSegments = trimmed
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -374,31 +375,26 @@ final class ClipboardClassifier {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Email
-        let emailPattern = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
         if matches(trimmed, regex: Self.emailRegex) {
             return .email
         }
 
         // Hex color (#RGB, #RRGGBB, #RRGGBBAA)
-        let hexColorPattern = "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$"
         if matches(trimmed, regex: Self.hexColorRegex) {
             return .hexColor
         }
 
         // RGB/RGBA color
-        let rgbPattern = "^rgba?\\s*\\(\\s*\\d{1,3}\\s*,\\s*\\d{1,3}\\s*,\\s*\\d{1,3}(\\s*,\\s*[\\d.]+)?\\s*\\)$"
         if matches(trimmed.lowercased(), regex: Self.rgbRegex) {
             return .hexColor
         }
 
         // UUID
-        let uuidPattern = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         if matches(trimmed, regex: Self.uuidRegex) {
             return .uuid
         }
 
         // IP Address (IPv4)
-        let ipPattern = "^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
         if matches(trimmed, regex: Self.ipv4Regex) {
             return .ipAddress
         }
@@ -410,37 +406,31 @@ final class ClipboardClassifier {
         }
 
         // Git SHA (7-40 hex chars)
-        let gitShaPattern = "^[0-9a-f]{7,40}$"
         if matches(trimmed.lowercased(), regex: Self.gitShaRegex) && !trimmed.contains(" ") {
             return .gitSha
         }
 
         // Coordinates (lat, long)
-        let coordPattern = "^-?\\d{1,3}\\.\\d+\\s*,\\s*-?\\d{1,3}\\.\\d+$"
         if matches(trimmed, regex: Self.coordRegex) {
             return .coordinates
         }
 
         // Hashtag
-        let hashtagPattern = "^#[A-Za-z][A-Za-z0-9_]*$"
         if matches(trimmed, regex: Self.hashtagRegex) {
             return .hashtag
         }
 
         // Mention (@username)
-        let mentionPattern = "^@[A-Za-z][A-Za-z0-9_]*$"
         if matches(trimmed, regex: Self.mentionRegex) {
             return .mention
         }
 
         // Currency ($100, €50, £30, ¥1000)
-        let currencyPattern = "^[\\$€£¥]\\s?[\\d,]+(\\.\\d{2})?$|^[\\d,]+(\\.\\d{2})?\\s?[\\$€£¥]$"
         if matches(trimmed, regex: Self.currencyRegex) {
             return .currency
         }
 
         // File path (Unix style)
-        let filePathPattern = "^(~(/[^/]+)*)/?$|^/([^/]+/)*[^/]+/?$"
         if matches(trimmed, regex: Self.filePathRegex) {
             return .filePath
         }
@@ -474,8 +464,7 @@ final class ClipboardClassifier {
 
         // Base64 (at least 20 chars, valid base64 alphabet, proper padding)
         if trimmed.count >= 20 {
-            let base64Pattern = "^[A-Za-z0-9+/]+=*$"
-            if matches(trimmed.replacingOccurrences(of: "\n", with: ""), pattern: base64Pattern) {
+            if matches(trimmed.replacingOccurrences(of: "\n", with: ""), regex: Self.base64Regex) {
                 if let data = Data(base64Encoded: trimmed.replacingOccurrences(of: "\n", with: "")),
                    data.count > 0 {
                     return .base64
@@ -484,9 +473,7 @@ final class ClipboardClassifier {
         }
 
         // URL encoded (contains %XX patterns)
-        let urlEncodedPattern = "(%[0-9A-Fa-f]{2})+"
-        if let regex = try? NSRegularExpression(pattern: urlEncodedPattern),
-           regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)) != nil {
+        if matches(trimmed, regex: Self.urlEncodedRegex) {
             if let decoded = trimmed.removingPercentEncoding, decoded != trimmed {
                 return .urlEncoded
             }

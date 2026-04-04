@@ -1,7 +1,7 @@
 import Cocoa
 import ApplicationServices
 
-struct CopyKeyEvent {
+struct CopyKeyEvent: Sendable {
     let timestamp: TimeInterval
     let appName: String
     let bundleID: String?

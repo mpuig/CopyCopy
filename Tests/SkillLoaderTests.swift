@@ -4,12 +4,15 @@ import XCTest
 @MainActor
 final class SkillLoaderTests: XCTestCase {
 
-    func testAllBuiltInSkillsLoad() {
-        let loader = SkillLoader()
-        // SkillLoader.init() calls loadAll() which parses all built-in skills
-        // If any skill fails to parse, it's logged but skipped.
-        // We verify the count matches BuiltInSkills.all
-        XCTAssertGreaterThanOrEqual(BuiltInSkills.all.count, 10)
+    func testAllBuiltInSkillsParse() throws {
+        for (id, content) in BuiltInSkills.all {
+            let skills = try SkillParser.parseAll(id: id, content: content, isBuiltIn: true)
+            XCTAssertFalse(skills.isEmpty, "Skill '\(id)' produced no actions")
+            for skill in skills {
+                XCTAssertNotNil(skill.executeFunction, "Skill '\(skill.id)' has invalid execute '\(skill.execute)'")
+                XCTAssertFalse(skill.description.isEmpty, "Skill '\(skill.id)' has empty description")
+            }
+        }
     }
 
     func testSkillMatchesContentType() throws {

@@ -847,9 +847,12 @@ enum ContentExtractor {
         text.split { $0.isWhitespace || $0.isNewline }.count
     }
 
+    private static let whitespaceCollapseRegex = try! NSRegularExpression(pattern: #"\s+"#)
+
     private static func normalizedText(_ text: String) -> String {
-        text.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let range = NSRange(text.startIndex..., in: text)
+        let collapsed = whitespaceCollapseRegex.stringByReplacingMatches(in: text, range: range, withTemplate: " ")
+        return collapsed.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func matches(_ regex: NSRegularExpression, in text: String) -> Bool {

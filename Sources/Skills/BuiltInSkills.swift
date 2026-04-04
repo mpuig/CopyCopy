@@ -2,39 +2,21 @@ import Foundation
 
 enum BuiltInSkills {
     static let all: [(id: String, content: String)] = [
-        // URL
         ("read-article", readArticle),
-        // Text cleanup
         ("clean-text", cleanText),
         ("html-to-markdown", htmlToMarkdown),
-        // AI writing
         ("fix-grammar", fixGrammar),
         ("summarize", summarize),
         ("translate", translate),
-        // AI contextual
         ("draft-chat-reply", draftChatReply),
         ("rewrite-email", rewriteEmail),
         ("extract-action-items", extractActionItems),
         ("explain-code", explainCode),
-        // Files
         ("open-file", openFile),
         ("reveal-in-finder", revealInFinder),
         ("reveal-path", revealPath),
         ("open-terminal", openTerminal),
     ]
-
-    // MARK: - Essential
-
-    static let openURL = """
----
-name: Open URL
-description: Open in default browser
-icon: link
-content-types: url
----
-
-openURL({clipboardURL})
-"""
 
     static let readArticle = """
 ---
@@ -48,23 +30,6 @@ source-boosts:
 
 fetchURL({clipboardURL})
 """
-
-    static let searchWeb = """
----
-name: Search
-description: Search DuckDuckGo
-icon: magnifyingglass
-content-types: text
-source-boosts:
-  browser: 70
-  ide: 30
-  other: 25
----
-
-openURL(https://duckduckgo.com/?q={clipboard})
-"""
-
-    // MARK: - Text Cleanup
 
     static let cleanText = """
 ---
@@ -97,8 +62,6 @@ source-boosts:
 htmlToMarkdown({clipboardHTML})
 """
 
-    // MARK: - AI Writing
-
     static let fixGrammar = """
 ---
 name: Fix Grammar
@@ -121,30 +84,6 @@ Rules:
 - Do not rewrite sentences that are already correct
 - Do not add or remove content
 - Output only the corrected text, nothing else
-"""
-
-    static let makeConcise = """
----
-name: Shorten
-description: Rewrite shorter and clearer
-icon: scissors
-content-types: text
-text-source: clipboardChatCleaned
-source-boosts:
-  email: 60
-  chat: 85
-  notes: 70
-  other: 35
----
-
-You are an editor. Rewrite the text below to be shorter and clearer.
-
-Rules:
-- Cut filler words, repetition, and unnecessary detail
-- Keep all key facts, names, dates, and commitments
-- Preserve the original tone (formal stays formal, casual stays casual)
-- Aim for 30-50% shorter than the original
-- Output only the rewritten text, nothing else
 """
 
     static let summarize = """
@@ -187,8 +126,6 @@ Rules:
 - If the text is already in English, return it unchanged
 - Output only the English translation, nothing else
 """
-
-    // MARK: - AI Contextual
 
     static let draftChatReply = """
 ---
@@ -283,49 +220,6 @@ Rules:
 - Output only the explanation, nothing else
 """
 
-    static let extractData = """
----
-name: Extract Data
-description: Extract emails, URLs, phones, dates from text
-icon: tablecells
-content-types: text
-text-source: clipboardLLM
-temperature: 0
-minimum-chars: 50
-source-boosts:
-  browser: 70
-  email: 60
-  notes: 50
----
-
-You are a data extractor. Find structured data in the text below.
-
-Rules:
-- Extract ONLY data that is explicitly written in the text
-- Group by type using these headers: Emails, URLs, Phone Numbers, Dates, Names
-- List each item on its own line with "- " prefix
-- Skip any type that has zero matches — do not include empty sections
-- NEVER invent, guess, or approximate any data
-- If nothing is found, say "No structured data found."
-- Output only the grouped list, nothing else
-"""
-
-    // MARK: - Places
-
-    static let openInMaps = """
----
-name: Open in Maps
-description: Open place or address in Apple Maps
-icon: map
-content-types: text
-entity-types: placeName, address, coordinates
----
-
-openURL(maps://?q={clipboard})
-"""
-
-    // MARK: - Files & Directories
-
     static let openFile = """
 ---
 name: Open File
@@ -347,8 +241,6 @@ content-types: files
 
 revealInFinder()
 """
-
-    // MARK: - Filesystem (text paths)
 
     static let revealPath = """
 ---

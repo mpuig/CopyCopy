@@ -22,6 +22,7 @@ final class AppModel: ObservableObject {
     private var lastTriggerTimestamp: TimeInterval?
     private var pendingShowRequestID: UUID?
     private var semanticClassificationTask: Task<Void, Never>?
+    private static let maxClassificationCacheSize = 50
     private var semanticClassificationCache: [String: [DetectedEntityType]] = [:]
     private var cancellables = Set<AnyCancellable>()
     private var floatingPanel: FloatingActionPanel?
@@ -250,6 +251,9 @@ final class AppModel: ObservableObject {
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
+                    if self.semanticClassificationCache.count >= Self.maxClassificationCacheSize {
+                        self.semanticClassificationCache.removeAll()
+                    }
                     self.semanticClassificationCache[cacheKey] = tags
                     guard let current = self.lastClipboardContext,
                           current.snapshot.changeCount == changeCount,

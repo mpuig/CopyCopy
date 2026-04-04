@@ -652,6 +652,14 @@ final class ToolExecutor {
 
                 let (data, response) = try await URLSession.shared.data(for: request)
 
+                // Limit response to 2MB to prevent memory issues
+                guard data.count <= 2_000_000 else {
+                    await MainActor.run {
+                        completion("Failed: Page too large (\(data.count / 1_000_000) MB)", false)
+                    }
+                    return
+                }
+
                 guard let httpResponse = response as? HTTPURLResponse,
                       (200...299).contains(httpResponse.statusCode) else {
                     await MainActor.run {

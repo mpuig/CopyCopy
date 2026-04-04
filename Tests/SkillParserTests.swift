@@ -272,11 +272,11 @@ final class SkillParserTests: XCTestCase {
         XCTAssertEqual(skill.description, "Explain what this code does")
     }
 
-    func testBuiltInSearchWebSkill() throws {
-        let skill = try SkillParser.parse(id: "search-web", content: BuiltInSkills.searchWeb, isBuiltIn: true)
+    func testBuiltInReadArticleSkill() throws {
+        let skill = try SkillParser.parse(id: "read-article", content: BuiltInSkills.readArticle, isBuiltIn: true)
 
-        XCTAssertEqual(skill.executeFunction, .openURLTemplate)
-        XCTAssertEqual(skill.parameters.properties["baseURL"]?.value, "https://duckduckgo.com/")
+        XCTAssertEqual(skill.executeFunction, .fetchURL)
+        XCTAssertEqual(skill.parameters.properties["url"]?.source, "clipboardURL")
     }
 
     func testBuiltInCleanTextSkill() throws {
@@ -307,11 +307,11 @@ final class SkillParserTests: XCTestCase {
         XCTAssertEqual(skill.sourceBoosts?["notes"], 80)
     }
 
-    func testBuiltInExtractDataSkill() throws {
-        let skill = try SkillParser.parse(id: "extract-data", content: BuiltInSkills.extractData, isBuiltIn: true)
+    func testBuiltInSummarizeSkill() throws {
+        let skill = try SkillParser.parse(id: "summarize", content: BuiltInSkills.summarize, isBuiltIn: true)
 
-        XCTAssertEqual(skill.executeFunction, .llmPrompt)
-        XCTAssertTrue(skill.tools.isEmpty)
+        XCTAssertEqual(skill.executeFunction, .summarize)
+        XCTAssertEqual(skill.minimumCharacterCount, 300)
     }
 
     // MARK: - Agent Skills (LLM with tools)
@@ -378,9 +378,20 @@ final class SkillParserTests: XCTestCase {
     }
 
     func testRoundTripURLTemplateSkill() throws {
-        let skill = try SkillParser.parse(id: "search-web", content: BuiltInSkills.searchWeb, isBuiltIn: true)
+        let content = """
+        ---
+        name: Search
+        description: Search DuckDuckGo
+        icon: magnifyingglass
+        content-types: text
+        ---
+
+        openURL(https://duckduckgo.com/?q={clipboard})
+        """
+
+        let skill = try SkillParser.parse(id: "search", content: content, isBuiltIn: true)
         let exported = SkillMarkdownFormatter.formatFlat(skill: skill)
-        let reparsed = try SkillParser.parse(id: "search-web", content: exported, isBuiltIn: false)
+        let reparsed = try SkillParser.parse(id: "search", content: exported, isBuiltIn: false)
 
         XCTAssertEqual(reparsed.executeFunction, .openURLTemplate)
         XCTAssertEqual(reparsed.parameters.properties["baseURL"]?.value, "https://duckduckgo.com/")

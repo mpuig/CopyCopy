@@ -1,9 +1,10 @@
 import Foundation
 
 enum SkillParser {
-    struct ParseError: Error, CustomStringConvertible {
+    struct ParseError: Error, LocalizedError, CustomStringConvertible {
         let message: String
         var description: String { message }
+        var errorDescription: String? { message }
     }
 
     // MARK: - Public API
