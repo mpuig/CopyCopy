@@ -350,28 +350,30 @@ struct FloatingPanelView: View {
             }
         }
         .padding(6)
+        .background(Color(NSColor.windowBackgroundColor).opacity(0.92))
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.25), radius: 24, x: 0, y: 8)
+        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 6)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.executedAction != nil)
     }
 
     private var headerSection: some View {
         HStack(spacing: 8) {
             Image(systemName: viewModel.contentTypeIcon)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.body)
+                .foregroundStyle(.tertiary)
+                .frame(width: 20, alignment: .center)
             Text(viewModel.contentTypeDescription)
-                .font(.subheadline)
+                .font(.callout)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             Spacer()
             if viewModel.processingState == .idle, !viewModel.actions.isEmpty {
-                Text("↑↓ ↵")
+                Text("↑↓")
                     .font(.caption2)
                     .foregroundStyle(.quaternary)
             }
@@ -411,13 +413,13 @@ struct FloatingPanelView: View {
     private var executedSection: some View {
         VStack(spacing: 0) {
             if let action = viewModel.executedAction {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: action.systemImage)
-                        .font(.subheadline)
+                        .font(.body)
                         .foregroundStyle(.secondary)
+                        .frame(width: 20, alignment: .center)
                     Text(action.title)
                         .font(.body)
-                        .fontWeight(.medium)
                     Spacer()
                     if viewModel.isGenerating {
                         Button(action: { viewModel.stopGeneration() }) {
@@ -464,7 +466,7 @@ struct FloatingPanelView: View {
                             ProgressView()
                                 .controlSize(.small)
                             Text(message)
-                                .font(.subheadline)
+                                .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -472,7 +474,7 @@ struct FloatingPanelView: View {
                     } else if let text = viewModel.resultText, !text.isEmpty {
                         ScrollView {
                             Text(text)
-                                .font(.body)
+                                .font(.callout)
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
