@@ -283,7 +283,7 @@ actor LlamaContext {
         #if targetEnvironment(simulator)
         modelParams.n_gpu_layers = 0
         #else
-        modelParams.n_gpu_layers = 999
+        modelParams.n_gpu_layers = -1  // -1 = all layers to GPU
         #endif
 
         guard let model = llama_model_load_from_file(path, modelParams) else {
@@ -293,12 +293,17 @@ actor LlamaContext {
         // Read chat template from GGUF metadata
         let ggufTemplate = readChatTemplate(from: model)
 
-        // Context params: dynamic size, flash attention, tuned threads
-        let trainCtx = llama_model_n_ctx_train(model)
-        let ctxSize = min(UInt32(trainCtx), 4096)
-
+        // Context params optimized for clipboard tool on Apple Silicon
         var ctxParams = llama_context_default_params()
-        ctxParams.n_ctx = max(ctxSize, 2048)
+        ctxParams.n_ctx = 4096
+        ctxParams.n_batch = 2048                                        // faster prompt ingestion
+        ctxParams.n_ubatch = 512                                        // physical batch size
+        ctxParams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED       // lower memory, faster attention
+        ctxParams.type_k = GGML_TYPE_Q8_0                               // quantized KV cache saves ~50% memory
+        ctxParams.type_v = GGML_TYPE_Q8_0
+        ctxParams.offload_kqv = true                                    // KV cache on GPU
+        ctxParams.no_perf = true                                        // skip perf timing overhead
+
         let nThreads = Int32(max(1, min(ProcessInfo.processInfo.processorCount, 8)))
         ctxParams.n_threads = nThreads
         ctxParams.n_threads_batch = nThreads
