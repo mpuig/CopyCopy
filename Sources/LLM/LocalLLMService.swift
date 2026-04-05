@@ -300,7 +300,9 @@ actor LlamaContext {
         // Read chat template from GGUF metadata
         let ggufTemplate = readChatTemplate(from: model)
 
-        // Context params optimized for clipboard tool on Apple Silicon
+        let nThreads = Int32(max(1, min(ProcessInfo.processInfo.processorCount, 8)))
+
+        // Try optimized params first
         var ctxParams = llama_context_default_params()
         ctxParams.n_ctx = 4096
         ctxParams.n_batch = batchSize
@@ -310,14 +312,23 @@ actor LlamaContext {
             ctxParams.type_k = GGML_TYPE_Q8_0
             ctxParams.type_v = GGML_TYPE_Q8_0
         }
-        ctxParams.offload_kqv = true                                    // KV cache on GPU
-        ctxParams.no_perf = true                                        // skip perf timing overhead
-
-        let nThreads = Int32(max(1, min(ProcessInfo.processInfo.processorCount, 8)))
+        ctxParams.offload_kqv = true
+        ctxParams.no_perf = true
         ctxParams.n_threads = nThreads
         ctxParams.n_threads_batch = nThreads
 
-        guard let context = llama_init_from_model(model, ctxParams) else {
+        var context = llama_init_from_model(model, ctxParams)
+
+        // Fallback: safe defaults if optimized params fail
+        if context == nil {
+            var safeParams = llama_context_default_params()
+            safeParams.n_ctx = 2048
+            safeParams.n_threads = nThreads
+            safeParams.n_threads_batch = nThreads
+            context = llama_init_from_model(model, safeParams)
+        }
+
+        guard let context else {
             llama_model_free(model)
             throw LocalLLMError.modelNotLoaded
         }
