@@ -9,7 +9,7 @@ CopyCopy is a macOS menu bar app that understands what you copy and offers the r
 - **On-device AI** — Summarize, translate, rewrite, explain code, and more using local GGUF models with Metal GPU acceleration. No API keys, no cloud.
 - **Pipeline actions** — Chain multiple steps: convert HTML → Markdown → Summarize → Translate. Each result feeds the next action with contextual follow-ups.
 - **Smart content detection** — Recognizes URLs, code snippets, file paths, foreign languages, email drafts, and 20+ content types.
-- **Source-aware ranking** — Surfaces the most relevant action based on whether you copied from email, chat, browser, IDE, or terminal. Learns from your choices.
+- **Learns from you** — Logs every action to `~/.copycopy/memory/`. The AI reads your patterns and suggests smarter follow-ups over time.
 - **Multiple models** — Choose from LFM, Gemma 4, or Qwen models. Download and switch from the menu bar.
 - **Extensible skills** — Create custom `SKILL.md` files in `~/.copycopy/skills/` to add your own actions or override built-ins.
 - **Double-⌘C trigger** — Configurable threshold. No always-on popup or clipboard history.

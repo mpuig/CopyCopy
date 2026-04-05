@@ -49,7 +49,8 @@ Sources/
 │   ├── ToolDefinition.swift     # Tool schema (used by legacy JSON parser)
 │   ├── ToolExecutor.swift       # Safe execution dispatch with streaming
 │   ├── ToolValidator.swift      # URL, host, path, and schema validation
-│   └── UsageHistory.swift       # Per-skill usage tracking for ranking boosts
+│   ├── UsageHistory.swift       # Per-skill usage tracking for ranking boosts
+│   └── SkillMemory.swift        # Persistent learning: daily logs + preferences
 ├── Suggestions/
 │   └── SuggestedAction.swift    # Action model for panel display
 ├── Utilities/
@@ -111,7 +112,20 @@ After a skill executes, contextual follow-up actions appear below the result. Th
 Copy HTML → Smart Markdown → Summarize → Translate
 ```
 
-Follow-ups are determined by re-running `SkillLoader.matchingActions()` on a synthetic `ClipboardContext` built from the result text. File/URL skills and the skill that just ran are excluded. Max 4 follow-ups shown. "Back" resets to the original clipboard actions.
+Follow-ups use a hybrid approach:
+1. Heuristic results shown immediately (instant)
+2. LLM runs in background with memory context (~1s)
+3. LLM reorders follow-ups based on what would produce meaningfully different output
+
+Previous pipeline steps show with +/- toggle to expand/collapse results. "Back" resets to the original clipboard actions.
+
+### Learning system
+
+`SkillMemory` (`Sources/Skills/SkillMemory.swift`) provides persistent learning:
+
+- **Daily logs** in `~/.copycopy/memory/YYYY-MM-DD.md` — every action is logged with timestamp, source app name, and pipeline chain
+- **Preferences** in `~/.copycopy/MEMORY.md` — consolidated patterns and user preferences
+- Both files are injected into the LLM follow-up prompt so it learns the user's patterns over time
 
 ### Usage history
 
