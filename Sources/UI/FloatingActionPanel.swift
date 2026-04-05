@@ -335,6 +335,16 @@ class FloatingPanelViewModel: ObservableObject {
         }
         isResultInClipboard = isInClipboard
         processingState = .completed
+
+        // Log to daily memory
+        let pipelineNames = pipelineSteps.map(\.action.title)
+        SkillMemory.shared.logAction(
+            skillId: executedAction?.skillId ?? "",
+            skillName: executedAction?.title ?? "",
+            sourceApp: context.sourceAppContext,
+            pipelineHistory: pipelineNames
+        )
+
         loadFollowUpActions()
     }
 
@@ -396,6 +406,7 @@ class FloatingPanelViewModel: ObservableObject {
             return
         }
 
+        // Build the available skills pool (excluding used + irrelevant)
         let resultContext = ClipboardContext.fromResultText(text, classifier: classifier)
         let matched = skillLoader.matchingActions(
             for: .plainText,
@@ -412,7 +423,73 @@ class FloatingPanelViewModel: ObservableObject {
         for step in pipelineSteps {
             excluded.insert(step.action.skillId)
         }
-        followUpActions = Array(matched.filter { !excluded.contains($0.skillId) }.prefix(4))
+        let candidates = matched.filter { !excluded.contains($0.skillId) }
+
+        // Immediate: show heuristic results while LLM thinks
+        followUpActions = Array(candidates.prefix(3))
+
+        // Background: ask LLM to pick smarter follow-ups
+        guard LocalLLMService.shared.isReady, candidates.count > 1 else { return }
+
+        let actionName = executedAction?.title ?? ""
+        let preview = String(text.prefix(300))
+        let availableList = candidates.map { "- \($0.skillId): \($0.title)" }.joined(separator: "\n")
+        let memoryContext = SkillMemory.shared.buildContext()
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let prompt = """
+                The user just ran "\(actionName)" and got this result:
+                \(preview)
+
+                \(memoryContext.isEmpty ? "" : memoryContext + "\n")
+                Available next actions:
+                \(availableList)
+
+                Pick 1-3 actions that would produce meaningfully different output. Skip actions that would give the same result. Reply ONLY as a JSON array of action IDs: ["id1", "id2"]
+                """
+
+                let response = try await LocalLLMService.shared.generate(
+                    prompt: prompt,
+                    systemPrompt: "You pick the most useful next clipboard actions. Reply only with a JSON array of action IDs.",
+                    temperature: 0,
+                    maxTokens: 50
+                )
+
+                // Parse JSON array from response
+                let suggested = self.parseSuggestedIds(from: response)
+
+                await MainActor.run {
+                    guard self.processingState == .completed else { return }
+                    if !suggested.isEmpty {
+                        let reordered = suggested.compactMap { id in
+                            candidates.first { $0.skillId == id }
+                        }
+                        if !reordered.isEmpty {
+                            self.followUpActions = reordered
+                        }
+                    }
+                }
+            } catch {
+                // LLM failed — keep heuristic results
+            }
+        }
+    }
+
+    private nonisolated func parseSuggestedIds(from response: String) -> [String] {
+        let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Find JSON array in response
+        guard let start = trimmed.firstIndex(of: "["),
+              let end = trimmed[start...].lastIndex(of: "]") else {
+            return []
+        }
+        let jsonString = String(trimmed[start...end])
+        guard let data = jsonString.data(using: .utf8),
+              let ids = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return ids
     }
 
     func stopGeneration() {
