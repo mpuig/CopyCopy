@@ -59,7 +59,7 @@ final class LocalLLMService: ObservableObject {
             loadingProgress = "Loading model..."
 
             let context = try await Task.detached(priority: .userInitiated) {
-                try LlamaContext.create(path: localPath.path, template: definition.chatTemplate)
+                try LlamaContext.create(path: localPath.path, template: definition.chatTemplate, batchSize: definition.batchSize, ubatchSize: definition.ubatchSize)
             }.value
 
             llamaContext = context
@@ -271,7 +271,7 @@ actor LlamaContext {
         llama_free(context)
     }
 
-    static func create(path: String, template: ChatTemplate) throws -> LlamaContext {
+    static func create(path: String, template: ChatTemplate, batchSize: UInt32 = 2048, ubatchSize: UInt32 = 512) throws -> LlamaContext {
         // Initialize backend once
         if !backendInitialized {
             llama_backend_init()
@@ -296,8 +296,8 @@ actor LlamaContext {
         // Context params optimized for clipboard tool on Apple Silicon
         var ctxParams = llama_context_default_params()
         ctxParams.n_ctx = 4096
-        ctxParams.n_batch = 2048                                        // faster prompt ingestion
-        ctxParams.n_ubatch = 512                                        // physical batch size
+        ctxParams.n_batch = batchSize                                   // per-model prompt ingestion speed
+        ctxParams.n_ubatch = ubatchSize                                 // per-model physical batch size
         ctxParams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED       // lower memory, faster attention
         ctxParams.type_k = GGML_TYPE_Q8_0                               // quantized KV cache saves ~50% memory
         ctxParams.type_v = GGML_TYPE_Q8_0

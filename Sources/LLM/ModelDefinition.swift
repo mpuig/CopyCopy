@@ -8,6 +8,8 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
     let sizeLabel: String
     let chatTemplate: ChatTemplate
     let defaultTemperature: Float
+    let batchSize: UInt32
+    let ubatchSize: UInt32
 
     var downloadURL: URL {
         URL(string: "https://huggingface.co/\(repo)/resolve/main/\(filename)")!
@@ -29,7 +31,9 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             filename: "LFM2.5-1.2B-Instruct-Q8_0.gguf",
             sizeLabel: "~1.2 GB",
             chatTemplate: .lfm,
-            defaultTemperature: 0.3
+            defaultTemperature: 0.3,
+            batchSize: 2048,
+            ubatchSize: 512
         ),
         ModelDefinition(
             id: "lfm-350m",
@@ -38,7 +42,9 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             filename: "LFM2.5-350M-Q8_0.gguf",
             sizeLabel: "~350 MB",
             chatTemplate: .lfm,
-            defaultTemperature: 0.3
+            defaultTemperature: 0.3,
+            batchSize: 2048,
+            ubatchSize: 512
         ),
         ModelDefinition(
             id: "gemma-4-e2b",
@@ -47,7 +53,9 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             filename: "gemma-4-e2b-it-Q8_0.gguf",
             sizeLabel: "~5 GB",
             chatTemplate: .gemma,
-            defaultTemperature: 1.0
+            defaultTemperature: 1.0,
+            batchSize: 512,
+            ubatchSize: 256
         ),
         ModelDefinition(
             id: "qwen-0.8b",
@@ -56,7 +64,9 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             filename: "Qwen3.5-0.8B-Q8_0.gguf",
             sizeLabel: "~0.8 GB",
             chatTemplate: .qwen,
-            defaultTemperature: 0.7
+            defaultTemperature: 0.7,
+            batchSize: 2048,
+            ubatchSize: 512
         ),
         ModelDefinition(
             id: "qwen-2b",
@@ -65,7 +75,9 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             filename: "Qwen3.5-2B-Q8_0.gguf",
             sizeLabel: "~2 GB",
             chatTemplate: .qwen,
-            defaultTemperature: 0.7
+            defaultTemperature: 0.7,
+            batchSize: 1024,
+            ubatchSize: 512
         ),
     ]
 
