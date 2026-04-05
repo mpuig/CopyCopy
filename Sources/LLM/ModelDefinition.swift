@@ -60,10 +60,10 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             sizeLabel: "~5 GB",
             chatTemplate: .gemma,
             defaultTemperature: 1.0,
-            batchSize: 256,
-            ubatchSize: 64,
-            flashAttention: false,
-            kvQuantized: true
+            batchSize: 2048,
+            ubatchSize: 512,
+            flashAttention: true,
+            kvQuantized: false
         ),
         ModelDefinition(
             id: "qwen-0.8b",
