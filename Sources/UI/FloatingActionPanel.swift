@@ -338,11 +338,13 @@ class FloatingPanelViewModel: ObservableObject {
 
         // Log to daily memory
         let pipelineNames = pipelineSteps.map(\.action.title)
+        let appName = context.copyEvent?.appName
+            ?? (context.snapshot.kind == .fileURLs ? "Finder" : nil)
         SkillMemory.shared.logAction(
             skillId: executedAction?.skillId ?? "",
             skillName: executedAction?.title ?? "",
             sourceApp: context.sourceAppContext,
-            appName: context.copyEvent?.appName,
+            appName: appName,
             pipelineHistory: pipelineNames
         )
 
