@@ -62,9 +62,9 @@ struct MenuContentView: View {
                     Task { await LocalLLMService.shared.loadModel() }
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: llmService.loadedModelId == def.id ? "checkmark.circle.fill" : "circle")
+                        Image(systemName: llmService.loadedModelId == def.id ? "circle.inset.filled" : "circle")
                             .font(.caption)
-                            .foregroundStyle(llmService.loadedModelId == def.id ? .green : .secondary)
+                            .foregroundStyle(llmService.loadedModelId == def.id ? .primary : .secondary)
                         Text(def.name)
                         Spacer()
                     }
