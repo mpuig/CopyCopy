@@ -342,6 +342,7 @@ class FloatingPanelViewModel: ObservableObject {
             skillId: executedAction?.skillId ?? "",
             skillName: executedAction?.title ?? "",
             sourceApp: context.sourceAppContext,
+            appName: context.copyEvent?.appName,
             pipelineHistory: pipelineNames
         )
 

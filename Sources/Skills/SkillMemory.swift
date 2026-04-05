@@ -20,12 +20,12 @@ final class SkillMemory {
     // MARK: - Daily Log
 
     /// Append an action to the daily log.
-    func logAction(skillId: String, skillName: String, sourceApp: SourceAppContext, pipelineHistory: [String] = []) {
+    func logAction(skillId: String, skillName: String, sourceApp: SourceAppContext, appName: String? = nil, pipelineHistory: [String] = []) {
         let today = todayFilename()
         let logFile = memoryDir.appendingPathComponent("\(today).md")
 
         let time = timeFormatter.string(from: Date())
-        let source = sourceApp.displayName
+        let source = appName ?? sourceApp.displayName
         let pipeline = pipelineHistory.isEmpty
             ? skillName
             : (pipelineHistory + [skillName]).joined(separator: " → ")
