@@ -59,7 +59,14 @@ final class LocalLLMService: ObservableObject {
             loadingProgress = "Loading model..."
 
             let context = try await Task.detached(priority: .userInitiated) {
-                try LlamaContext.create(path: localPath.path, template: definition.chatTemplate, batchSize: definition.batchSize, ubatchSize: definition.ubatchSize)
+                try LlamaContext.create(
+                    path: localPath.path,
+                    template: definition.chatTemplate,
+                    batchSize: definition.batchSize,
+                    ubatchSize: definition.ubatchSize,
+                    flashAttention: definition.flashAttention,
+                    kvQuantized: definition.kvQuantized
+                )
             }.value
 
             llamaContext = context
@@ -271,7 +278,7 @@ actor LlamaContext {
         llama_free(context)
     }
 
-    static func create(path: String, template: ChatTemplate, batchSize: UInt32 = 2048, ubatchSize: UInt32 = 512) throws -> LlamaContext {
+    static func create(path: String, template: ChatTemplate, batchSize: UInt32 = 2048, ubatchSize: UInt32 = 512, flashAttention: Bool = true, kvQuantized: Bool = true) throws -> LlamaContext {
         // Initialize backend once
         if !backendInitialized {
             llama_backend_init()
@@ -296,11 +303,13 @@ actor LlamaContext {
         // Context params optimized for clipboard tool on Apple Silicon
         var ctxParams = llama_context_default_params()
         ctxParams.n_ctx = 4096
-        ctxParams.n_batch = batchSize                                   // per-model prompt ingestion speed
-        ctxParams.n_ubatch = ubatchSize                                 // per-model physical batch size
-        ctxParams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED       // lower memory, faster attention
-        ctxParams.type_k = GGML_TYPE_Q8_0                               // quantized KV cache saves ~50% memory
-        ctxParams.type_v = GGML_TYPE_Q8_0
+        ctxParams.n_batch = batchSize
+        ctxParams.n_ubatch = ubatchSize
+        ctxParams.flash_attn_type = flashAttention ? LLAMA_FLASH_ATTN_TYPE_ENABLED : LLAMA_FLASH_ATTN_TYPE_DISABLED
+        if kvQuantized {
+            ctxParams.type_k = GGML_TYPE_Q8_0
+            ctxParams.type_v = GGML_TYPE_Q8_0
+        }
         ctxParams.offload_kqv = true                                    // KV cache on GPU
         ctxParams.no_perf = true                                        // skip perf timing overhead
 

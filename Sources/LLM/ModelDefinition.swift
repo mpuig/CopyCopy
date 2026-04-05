@@ -10,6 +10,8 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
     let defaultTemperature: Float
     let batchSize: UInt32
     let ubatchSize: UInt32
+    let flashAttention: Bool
+    let kvQuantized: Bool
 
     var downloadURL: URL {
         URL(string: "https://huggingface.co/\(repo)/resolve/main/\(filename)")!
@@ -33,7 +35,9 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             chatTemplate: .lfm,
             defaultTemperature: 0.3,
             batchSize: 2048,
-            ubatchSize: 512
+            ubatchSize: 512,
+            flashAttention: true,
+            kvQuantized: true
         ),
         ModelDefinition(
             id: "lfm-350m",
@@ -44,7 +48,9 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             chatTemplate: .lfm,
             defaultTemperature: 0.3,
             batchSize: 2048,
-            ubatchSize: 512
+            ubatchSize: 512,
+            flashAttention: true,
+            kvQuantized: true
         ),
         ModelDefinition(
             id: "gemma-4-e2b",
@@ -54,8 +60,10 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             sizeLabel: "~5 GB",
             chatTemplate: .gemma,
             defaultTemperature: 1.0,
-            batchSize: 512,
-            ubatchSize: 256
+            batchSize: 256,
+            ubatchSize: 64,
+            flashAttention: false,
+            kvQuantized: true
         ),
         ModelDefinition(
             id: "qwen-0.8b",
@@ -66,7 +74,9 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             chatTemplate: .qwen,
             defaultTemperature: 0.7,
             batchSize: 2048,
-            ubatchSize: 512
+            ubatchSize: 512,
+            flashAttention: true,
+            kvQuantized: true
         ),
         ModelDefinition(
             id: "qwen-2b",
@@ -77,7 +87,9 @@ struct ModelDefinition: Identifiable, Equatable, Hashable {
             chatTemplate: .qwen,
             defaultTemperature: 0.7,
             batchSize: 1024,
-            ubatchSize: 512
+            ubatchSize: 512,
+            flashAttention: true,
+            kvQuantized: true
         ),
     ]
 
