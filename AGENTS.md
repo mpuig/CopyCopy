@@ -161,6 +161,9 @@ swift test
 
 # Development: build, reset, and run
 clear && defaults delete com.copycopy.app 2>/dev/null; killall CopyCopy 2>/dev/null; ./build_xcode.sh && rm -rf ~/.copycopy/skills && open -n ./dist/CopyCopy.app
+
+# Full reset (includes TCC permissions): useful after code signing or entitlement changes
+clear && killall CopyCopy 2>/dev/null; tccutil reset All com.copycopy.app && defaults delete com.copycopy.app 2>/dev/null; ./build_xcode.sh && rm -rf ~/.copycopy/skills && open -n ./dist/CopyCopy.app
 ```
 
 ## Dependencies

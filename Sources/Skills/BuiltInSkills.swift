@@ -3,7 +3,6 @@ import Foundation
 enum BuiltInSkills {
     static let all: [(id: String, content: String)] = [
         ("read-article", readArticle),
-        ("html-to-markdown", htmlToMarkdown),
         ("smart-markdown", smartMarkdown),
         ("fix-grammar", fixGrammar),
         ("summarize", summarize),
@@ -18,6 +17,8 @@ enum BuiltInSkills {
         ("open-terminal", openTerminal),
     ]
 
+    // MARK: - URL
+
     static let readArticle = """
 ---
 name: Read Article
@@ -31,26 +32,13 @@ source-boosts:
 fetchURL({clipboardURL})
 """
 
-    static let cleanText = """
----
-name: Clean Text
-description: Strip formatting and fix whitespace
-icon: sparkles
-content-types: text
-source-boosts:
-  browser: 60
-  email: 50
-  notes: 40
----
+    // MARK: - Text Transforms
 
-copyToClipboard({clipboardClean})
-"""
-
-    static let htmlToMarkdown = """
+    static let smartMarkdown = """
 ---
-name: Convert to Markdown
-description: Convert HTML to clean Markdown
-icon: arrow.down.doc.text
+name: Smart Markdown
+description: Convert to clean Markdown with AI cleanup
+icon: wand.and.stars
 content-types: text
 source-boosts:
   browser: 120
@@ -58,23 +46,10 @@ source-boosts:
   notes: 90
 ---
 
-htmlToMarkdown({clipboardHTML})
-"""
-
-    static let smartMarkdown = """
----
-name: Smart Markdown
-description: Convert HTML to clean Markdown with AI cleanup
-icon: wand.and.stars
-content-types: text
-source-boosts:
-  browser: 110
-  email: 90
-  notes: 80
----
-
 htmlToMarkdownLLM({clipboardHTML})
 """
+
+    // MARK: - AI Writing
 
     static let fixGrammar = """
 ---
@@ -100,7 +75,7 @@ description: Summarize into key points
 execute: summarize
 content-types: text
 text-source: clipboardChatCleaned
-minimum-chars: 300
+minimum-chars: 200
 source-boosts:
   chat: 110
   email: 75
@@ -115,7 +90,7 @@ Summarize into key points
     static let translate = """
 ---
 name: Translate
-description: Translate to English
+description: Translate to user's language
 icon: globe
 content-types: text
 entity-types: foreignLanguage
@@ -125,8 +100,10 @@ source-boosts:
   other: 25
 ---
 
-Translate to English. Keep proper nouns and technical terms unchanged. Output only the translation.
+Detect the language of this text and translate it to the other language in the conversation. If there is no conversation context, translate to English. Keep proper nouns and technical terms unchanged. Output only the translation.
 """
+
+    // MARK: - AI Contextual
 
     static let draftChatReply = """
 ---
@@ -166,7 +143,7 @@ description: Extract action items and next steps
 icon: checklist
 content-types: text
 text-source: clipboardChatCleaned
-minimum-chars: 500
+minimum-chars: 100
 temperature: 0
 source-boosts:
   chat: 110
@@ -192,6 +169,8 @@ source-boosts:
 
 Explain what this code does. Cover key logic, inputs, outputs, and risks. Use short bullet points. Do not rewrite the code. Output only the explanation.
 """
+
+    // MARK: - Files
 
     static let openFile = """
 ---

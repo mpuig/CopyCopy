@@ -298,9 +298,9 @@ body {
 
 .how__steps {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-xl);
-  max-width: 780px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-lg);
+  max-width: 960px;
   margin: 0 auto;
 }
 
@@ -356,7 +356,7 @@ body {
 
 .scenarios__grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-md);
 }
 
@@ -370,6 +370,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  min-width: 0;
 }
 
 .scenario:hover {
@@ -602,9 +603,9 @@ body {
   }
 
   .how__steps {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: var(--space-lg);
-    max-width: 320px;
+    max-width: 480px;
   }
 
   .scenarios__grid {
