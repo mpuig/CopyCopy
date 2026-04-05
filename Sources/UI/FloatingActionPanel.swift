@@ -13,8 +13,8 @@ class FloatingActionPanel: NSPanel {
         contentViewModel.onActionStarted = onActionStarted
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
-            styleMask: [.borderless, .nonactivatingPanel],
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
+            styleMask: [.borderless, .nonactivatingPanel, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -201,7 +201,8 @@ class FloatingPanelViewModel: ObservableObject {
     private let classifier = ClipboardClassifier()
     private static let executionTimeoutNanoseconds: UInt64 = 30_000_000_000
     private static let followUpExcluded: Set<String> = [
-        "open-file", "reveal-in-finder", "reveal-path", "open-terminal", "read-article"
+        "open-file", "reveal-in-finder", "reveal-path", "open-terminal", "read-article",
+        "html-to-markdown", "smart-markdown"
     ]
 
     @Published var actions: [SuggestedAction]
@@ -540,31 +541,28 @@ struct FloatingPanelView: View {
     }
 
     private var executedSection: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // Pipeline history: action + collapsible result pairs
-                ForEach(Array(viewModel.pipelineSteps.indices), id: \.self) { index in
-                    let step = viewModel.pipelineSteps[index]
-                    pipelineStepRow(step: step, index: index)
-                }
+        VStack(spacing: 0) {
+            // Pipeline history: action + collapsible result pairs
+            ForEach(Array(viewModel.pipelineSteps.indices), id: \.self) { index in
+                let step = viewModel.pipelineSteps[index]
+                pipelineStepRow(step: step, index: index)
+            }
 
-                // Current action
-                if let action = viewModel.executedAction {
-                    currentActionRow(action: action)
-                }
+            // Current action
+            if let action = viewModel.executedAction {
+                currentActionRow(action: action)
+            }
 
-                // Current result (processing or completed)
-                if viewModel.processingState != .idle {
-                    currentResultSection
-                }
+            // Current result (processing or completed)
+            if viewModel.processingState != .idle {
+                currentResultSection
+            }
 
-                // Follow-up actions
-                if viewModel.processingState == .completed {
-                    followUpSection
-                }
+            // Follow-up actions
+            if viewModel.processingState == .completed {
+                followUpSection
             }
         }
-        .frame(maxHeight: 500)
     }
 
     private func pipelineStepRow(step: PipelineStep, index: Int) -> some View {
@@ -572,15 +570,18 @@ struct FloatingPanelView: View {
             HStack(spacing: 10) {
                 Image(systemName: step.action.systemImage)
                     .font(.body)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .frame(width: 20, alignment: .center)
                 Text(step.action.title)
                     .font(.body)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                 Spacer()
+                Image(systemName: step.isExpanded ? "minus.circle" : "plus.circle")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
                 Image(systemName: "checkmark.circle.fill")
                     .font(.body)
-                    .foregroundStyle(.green.opacity(0.5))
+                    .foregroundStyle(.green)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -592,13 +593,19 @@ struct FloatingPanelView: View {
             }
 
             if step.isExpanded {
-                Text(step.resultText)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .padding(.leading, 30)
+                ScrollView {
+                    Text(step.resultText)
+                        .font(.callout)
+                        .foregroundStyle(.primary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                }
+                .frame(maxHeight: 200)
+                .background(Color(NSColor.textBackgroundColor).opacity(0.3))
+                .cornerRadius(6)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
             }
         }
     }
@@ -646,13 +653,18 @@ struct FloatingPanelView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
             } else if let text = viewModel.resultText, !text.isEmpty {
-                Text(text)
-                    .font(.callout)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .padding(.leading, 20)
+                ScrollView {
+                    Text(text)
+                        .font(.callout)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                }
+                .frame(maxHeight: 300)
+                .background(Color(NSColor.textBackgroundColor).opacity(0.3))
+                .cornerRadius(6)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
 
                 // Copied to clipboard — below the result
                 if viewModel.isResultInClipboard, !viewModel.isGenerating {
