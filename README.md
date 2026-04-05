@@ -1,8 +1,8 @@
 # CopyCopy
 
-Copy anything. Get the smart action.
+Transform anything you copy.
 
-CopyCopy is a macOS menu bar app that understands what you copy and offers the right action instantly. Double-press ⌘C and a floating panel appears with context-aware suggestions — rewrite an email, summarize an article, format JSON, convert HTML to Markdown — all powered by an on-device LLM. Nothing leaves your Mac.
+CopyCopy is a macOS menu bar app that transforms your clipboard with on-device AI. Double-press ⌘C and a floating panel suggests the right action — summarize, translate, rewrite, explain code — then chain follow-ups into a pipeline. It learns from your choices and gets smarter over time. Nothing leaves your Mac.
 
 ## Features
 
