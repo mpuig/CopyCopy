@@ -221,6 +221,143 @@ body {
 }
 
 /* ---------------------------------------- */
+/* Install                                  */
+/* ---------------------------------------- */
+
+.install {
+  padding: var(--space-2xl) 0;
+  background: var(--bg-sunken);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.install__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-xl);
+  text-align: center;
+}
+
+.install__methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+  max-width: 680px;
+  margin: 0 auto var(--space-xl);
+}
+
+.install__method {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+}
+
+.install__method-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: var(--space-sm);
+}
+
+.install__method-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.install__method-desc a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.install__method-desc a:hover {
+  text-decoration: underline;
+}
+
+.install__code {
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.install__notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+  max-width: 680px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+}
+
+.install__notice-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.install__notice-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.install__notice-header svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.install__notice-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.install__notice-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.install__notice-img {
+  max-width: 200px;
+  width: 100%;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+@media (max-width: 768px) {
+  .install__notice {
+    flex-direction: column;
+  }
+
+  .install__notice-img {
+    max-width: 240px;
+  }
+}
+
+@media (max-width: 768px) {
+  .install__methods {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------- */
 /* Problem                                  */
 /* ---------------------------------------- */
 
