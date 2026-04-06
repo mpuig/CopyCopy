@@ -100,11 +100,17 @@ if [[ -n "${APP_IDENTITY:-}" ]]; then
   # Notarize (requires APP_IDENTITY and APP_PASSWORD set)
   if [[ -n "${APP_PASSWORD:-}" && -n "${APPLE_ID:-}" ]]; then
     echo "📤 Uploading for notarization..."
-    OUTPUT=$(xcrun notarytool submit "$APP_DIR" \
+    NOTARIZE_ZIP="$ROOT_DIR/dist/CopyCopy-notarize.zip"
+    ditto -c -k --keepParent "$APP_DIR" "$NOTARIZE_ZIP"
+
+    OUTPUT=$(xcrun notarytool submit "$NOTARIZE_ZIP" \
       --apple-id "$APPLE_ID" \
       --password "$APP_PASSWORD" \
       --team-id "$TEAM_ID" \
-      --wait 2>&1 | tee /dev/tty)
+      --wait 2>&1)
+    echo "$OUTPUT"
+
+    rm -f "$NOTARIZE_ZIP"
 
     REQUEST_ID=$(echo "$OUTPUT" | grep -oE 'id: [0-9a-f-]+' | cut -d' ' -f2)
 

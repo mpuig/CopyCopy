@@ -58,21 +58,31 @@ jobs:
         run: |
           ./scripts/verify_app_bundle.sh
 
-      - name: Sign, notarize, and staple (required for notarized releases)
+      - name: Sign app bundle
         if: github.event_name == 'release'
         env:
           APP_IDENTITY: ${{ secrets.APP_IDENTITY }}
-          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          NOTARYTOOL_KEYCHAIN_PROFILE: ${{ secrets.NOTARYTOOL_KEYCHAIN_PROFILE }}
         run: |
           set -euo pipefail
           if [[ -z "${APP_IDENTITY}" ]]; then
             echo "Missing secret: APP_IDENTITY" >&2
             exit 1
           fi
-          ./scripts/sign_and_notarize.sh
+          APP_BUNDLE="dist/CopyCopy.app"
+          xattr -cr "$APP_BUNDLE" 2>/dev/null || true
+          codesign --force --deep --timestamp --options runtime --sign "$APP_IDENTITY" "$APP_BUNDLE"
+          codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+          echo "✅ Signed with: $APP_IDENTITY"
+
+      # TODO: Re-enable notarization once Apple Developer agreement is accepted
+      # - name: Notarize and staple
+      #   if: github.event_name == 'release'
+      #   env:
+      #     APP_IDENTITY: ${{ secrets.APP_IDENTITY }}
+      #     APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+      #     APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      #     APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      #   run: ./scripts/sign_and_notarize.sh
 
       - name: Package app bundle
         id: package
