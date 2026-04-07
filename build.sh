@@ -44,6 +44,11 @@ mkdir -p "$APP_DIR/Contents/Frameworks"
 
 cp "$UNIVERSAL_BIN" "$APP_DIR/Contents/MacOS/CopyCopy"
 
+# Copy app icon
+if [ -f "$ROOT_DIR/AppBundle/AppIcon.icns" ]; then
+    cp "$ROOT_DIR/AppBundle/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
+fi
+
 # Copy SwiftPM resource bundles (e.g. KeyboardShortcuts) into the app.
 shopt -s nullglob
 for bundle in "$ARM_BUILD_DIR"/*.bundle; do
@@ -55,10 +60,16 @@ shopt -u nullglob
 SPARKLE_SRC="$ARM_BUILD_DIR/Sparkle.framework"
 if [ -d "$SPARKLE_SRC" ]; then
     cp -R "$SPARKLE_SRC" "$APP_DIR/Contents/Frameworks/"
-
-    # Update rpath to find framework in app bundle
-    install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP_DIR/Contents/MacOS/CopyCopy" 2>/dev/null || true
 fi
+
+# Copy llama.framework (if present) into Frameworks.
+LLAMA_SRC="$ARM_BUILD_DIR/llama.framework"
+if [ -d "$LLAMA_SRC" ]; then
+    cp -R "$LLAMA_SRC" "$APP_DIR/Contents/Frameworks/"
+fi
+
+# Update rpath to find frameworks in app bundle
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP_DIR/Contents/MacOS/CopyCopy" 2>/dev/null || true
 
 GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
 BUILD_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -80,6 +91,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>${MIN_VER}</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CopyCopyBuildTimestamp</key><string>${BUILD_TIMESTAMP}</string>
   <key>CopyCopyGitCommit</key><string>${GIT_COMMIT}</string>
   <key>CopyCopyHomepageURL</key><string>${HOMEPAGE_URL}</string>

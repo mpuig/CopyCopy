@@ -42,6 +42,8 @@ class FloatingActionPanel: NSPanel {
 
     private func setupContent() {
         let hostingView = NSHostingView(rootView: FloatingPanelView(viewModel: contentViewModel))
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = .clear
         contentView = hostingView
     }
 
