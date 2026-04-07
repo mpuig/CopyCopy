@@ -626,7 +626,7 @@ final class ToolExecutor {
     private func ensureModelReady(onStatus: @escaping StatusCallback) async {
         let enabled = await MainActor.run { UserDefaults.standard.bool(forKey: "llmEnabled") }
         guard enabled else { return }
-        let isReady = await LocalLLMService.shared.isReady
+        let isReady = LocalLLMService.shared.isReady
         if !isReady {
             await MainActor.run { onStatus("Loading model…") }
         }
@@ -748,10 +748,11 @@ final class ToolExecutor {
                 }
 
                 result += markdown
+                let finalResult = result
 
                 await MainActor.run {
-                    self.copyToClipboard(result)
-                    completion(result, true)
+                    self.copyToClipboard(finalResult)
+                    completion(finalResult, true)
                 }
             } catch {
                 Logger.error("Fetch URL failed: \(error)", category: .actions)

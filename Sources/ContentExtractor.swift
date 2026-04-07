@@ -327,7 +327,7 @@ enum ContentExtractor {
             }
 
             // Remove blocks heavy on social links (profile cards, share sections)
-            let socialLinkCount = try links.reduce(0) { partial, link in
+            let socialLinkCount = links.reduce(0) { partial, link in
                 let href = (try? link.attr("href")) ?? ""
                 return partial + (socialLinkDomains.contains(where: { href.contains($0) }) ? 1 : 0)
             }

@@ -42,8 +42,6 @@ class FloatingActionPanel: NSPanel {
 
     private func setupContent() {
         let hostingView = NSHostingView(rootView: FloatingPanelView(viewModel: contentViewModel))
-        hostingView.wantsLayer = true
-        hostingView.layer?.backgroundColor = .clear
         contentView = hostingView
     }
 
@@ -562,9 +560,10 @@ struct FloatingPanelView: View {
             }
         }
         .padding(6)
-        .background(Color(NSColor.windowBackgroundColor).opacity(0.92))
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(NSColor.windowBackgroundColor))
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
