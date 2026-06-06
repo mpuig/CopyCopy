@@ -194,85 +194,147 @@
 
       <!-- Scenarios -->
       <section class="scenarios container">
-        <h2 class="scenarios__heading">It knows what you need</h2>
+        <p class="scenarios__label reveal">Context-aware</p>
+        <h2 class="scenarios__heading reveal">It knows what you need</h2>
+        <p class="scenarios__sub reveal">CopyCopy reads the content and the app it came from, then ranks the best next action. Hover a card to see the result.</p>
         <div class="scenarios__grid">
 
           <div class="scenario reveal">
             <div class="scenario__head">
-              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18v14H3z M3 6l9 7 9-7"/></svg></span>
+              <span class="scenario__appicon" style="--src-tint: color-mix(in srgb, #2A6FDB 12%, var(--bg-raised)); --src-tint-bd: color-mix(in srgb, #2A6FDB 30%, var(--border)); --src-ink: #2A6FDB;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18v14H3z M3 6l9 7 9-7"/></svg></span>
               <span class="scenario__source">Copied from Mail</span>
             </div>
             <div class="scenario__content">"Hey, just wanted to follow up on the thing we discussed re: the timeline for..."</div>
-            <div class="scenario__arrow">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
-              CopyCopy suggests
+            <div class="scenario__flip">
+              <div class="scenario__arrow">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+                CopyCopy suggests
+              </div>
+              <div class="scenario__result">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4.5L6.5 11 3 7.5"/></svg>
+                <span>"Following up on our timeline discussion — do you have a revised date?"</span>
+              </div>
             </div>
-            <div class="scenario__action">Rewrite Email</div>
+            <div class="scenario__action">
+              <span class="scenario__action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l1.4 4L17 9l-3.6 1L12 14l-1.4-4L7 9l3.6-1z M18 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span>
+              <span class="scenario__action-label">Rewrite Email</span>
+              <span class="scenario__action-ret">↵</span>
+            </div>
           </div>
 
           <div class="scenario reveal">
             <div class="scenario__head">
-              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z M16 8l-2.5 5.5L8 16l2.5-5.5z"/></svg></span>
+              <span class="scenario__appicon" style="--src-tint: color-mix(in srgb, #1B8CD8 12%, var(--bg-raised)); --src-tint-bd: color-mix(in srgb, #1B8CD8 30%, var(--border)); --src-ink: #1B8CD8;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z M16 8l-2.5 5.5L8 16l2.5-5.5z"/></svg></span>
               <span class="scenario__source">Copied from Safari</span>
             </div>
             <div class="scenario__content">&lt;article class="post"&gt;&lt;h1&gt;Understanding Transformers&lt;/h1&gt;...</div>
-            <div class="scenario__arrow">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
-              CopyCopy suggests
+            <div class="scenario__flip">
+              <div class="scenario__arrow">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+                CopyCopy suggests
+              </div>
+              <div class="scenario__result">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4.5L6.5 11 3 7.5"/></svg>
+                <span>Clean Markdown — navigation, ads, and boilerplate stripped out.</span>
+              </div>
             </div>
-            <div class="scenario__action">Smart Markdown</div>
+            <div class="scenario__action">
+              <span class="scenario__action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M8 13h8 M8 17h8 M8 9h2"/></svg></span>
+              <span class="scenario__action-label">Smart Markdown</span>
+              <span class="scenario__action-ret">↵</span>
+            </div>
           </div>
 
           <div class="scenario reveal">
             <div class="scenario__head">
-              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7l-5 5 5 5 M15 7l5 5-5 5"/></svg></span>
+              <span class="scenario__appicon" style="--src-tint: color-mix(in srgb, #2F86D6 12%, var(--bg-raised)); --src-tint-bd: color-mix(in srgb, #2F86D6 30%, var(--border)); --src-ink: #2F86D6;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7l-5 5 5 5 M15 7l5 5-5 5"/></svg></span>
               <span class="scenario__source">Copied from VS Code</span>
             </div>
             <div class="scenario__content">async function fetchUser(id) { const res = await fetch(`/api/users/${id}`)...</div>
-            <div class="scenario__arrow">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
-              CopyCopy suggests
+            <div class="scenario__flip">
+              <div class="scenario__arrow">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+                CopyCopy suggests
+              </div>
+              <div class="scenario__result">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4.5L6.5 11 3 7.5"/></svg>
+                <span>Fetches a user by id from the /api/users endpoint and returns the parsed JSON.</span>
+              </div>
             </div>
-            <div class="scenario__action">Explain Code</div>
+            <div class="scenario__action">
+              <span class="scenario__action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 8h6v3a3 3 0 01-6 0z M9 11a6 6 0 0012 0 M5 11h2 M17 11h2 M8 3l1.5 1.5 M16 3l-1.5 1.5"/></svg></span>
+              <span class="scenario__action-label">Explain Code</span>
+              <span class="scenario__action-ret">↵</span>
+            </div>
           </div>
 
           <div class="scenario reveal">
             <div class="scenario__head">
-              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9h8a2 2 0 010 4H6a2 2 0 010-4z M10 6v8 M14 11a2 2 0 01-4 0"/></svg></span>
+              <span class="scenario__appicon" style="--src-tint: color-mix(in srgb, #7A4D8C 12%, var(--bg-raised)); --src-tint-bd: color-mix(in srgb, #7A4D8C 30%, var(--border)); --src-ink: #7A4D8C;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9h8a2 2 0 010 4H6a2 2 0 010-4z M10 6v8 M14 11a2 2 0 01-4 0"/></svg></span>
               <span class="scenario__source">Copied from Slack</span>
             </div>
             <div class="scenario__content">The meeting notes from today: we agreed to push the release to next sprint and...</div>
-            <div class="scenario__arrow">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
-              CopyCopy suggests
+            <div class="scenario__flip">
+              <div class="scenario__arrow">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+                CopyCopy suggests
+              </div>
+              <div class="scenario__result">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4.5L6.5 11 3 7.5"/></svg>
+                <span>Release pushed to next sprint · owners assigned · re-check scope Friday.</span>
+              </div>
             </div>
-            <div class="scenario__action">Summarize</div>
+            <div class="scenario__action">
+              <span class="scenario__action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01"/></svg></span>
+              <span class="scenario__action-label">Summarize</span>
+              <span class="scenario__action-ret">↵</span>
+            </div>
           </div>
 
           <div class="scenario reveal">
             <div class="scenario__head">
-              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7 M7 4v1c0 3-1.5 6-4 8 M5 9c0 2 2 4 5 5 M13 19l4-9 4 9 M14.5 16h5"/></svg></span>
+              <span class="scenario__appicon" style="--src-tint: color-mix(in srgb, #1F8A5B 12%, var(--bg-raised)); --src-tint-bd: color-mix(in srgb, #1F8A5B 30%, var(--border)); --src-ink: #1F8A5B;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7 M7 4v1c0 3-1.5 6-4 8 M5 9c0 2 2 4 5 5 M13 19l4-9 4 9 M14.5 16h5"/></svg></span>
               <span class="scenario__source">Copied foreign text</span>
             </div>
             <div class="scenario__content">Les modifications apportées au système de gestion des données permettent une...</div>
-            <div class="scenario__arrow">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
-              CopyCopy suggests
+            <div class="scenario__flip">
+              <div class="scenario__arrow">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+                CopyCopy suggests
+              </div>
+              <div class="scenario__result">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4.5L6.5 11 3 7.5"/></svg>
+                <span>The changes made to the data-management system allow for greater flexibility.</span>
+              </div>
             </div>
-            <div class="scenario__action">Translate</div>
+            <div class="scenario__action">
+              <span class="scenario__action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z M2 12h20 M12 2a15 15 0 010 20 M12 2a15 15 0 000 20"/></svg></span>
+              <span class="scenario__action-label">Translate</span>
+              <span class="scenario__action-ret">↵</span>
+            </div>
           </div>
 
           <div class="scenario reveal">
             <div class="scenario__head">
-              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z M2 12h20 M12 2a15 15 0 010 20 M12 2a15 15 0 000 20"/></svg></span>
+              <span class="scenario__appicon" style="--src-tint: var(--accent-soft); --src-tint-bd: color-mix(in srgb, var(--accent) 30%, var(--border)); --src-ink: var(--accent);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z M2 12h20 M12 2a15 15 0 010 20 M12 2a15 15 0 000 20"/></svg></span>
               <span class="scenario__source">Copied a URL</span>
             </div>
             <div class="scenario__content">https://example.com/blog/how-to-build-ai-agents-from-scratch</div>
-            <div class="scenario__arrow">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
-              CopyCopy suggests
+            <div class="scenario__flip">
+              <div class="scenario__arrow">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
+                CopyCopy suggests
+              </div>
+              <div class="scenario__result">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4.5L6.5 11 3 7.5"/></svg>
+                <span>Fetched and cleaned — the readable article, ready to summarize or save.</span>
+              </div>
             </div>
-            <div class="scenario__action">Read Article</div>
+            <div class="scenario__action">
+              <span class="scenario__action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 100 14 7 7 0 000-14z M21 21l-4.3-4.3"/></svg></span>
+              <span class="scenario__action-label">Read Article</span>
+              <span class="scenario__action-ret">↵</span>
+            </div>
           </div>
 
         </div>
