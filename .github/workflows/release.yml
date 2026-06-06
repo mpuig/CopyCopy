@@ -23,6 +23,19 @@ jobs:
           sudo xcode-select -s /Applications/Xcode.app
           xcodebuild -version
 
+      - name: Check version.env matches the release tag
+        if: github.event_name == 'release'
+        run: |
+          set -euo pipefail
+          source ./version.env
+          TAG="${{ github.event.release.tag_name }}"
+          if [[ "$TAG" != "v${VERSION}" ]]; then
+            echo "Release tag ($TAG) does not match version.env VERSION (v${VERSION})." >&2
+            echo "Bump VERSION (and BUILD) in version.env before tagging the release." >&2
+            exit 1
+          fi
+          echo "✅ version.env matches tag: $TAG"
+
       - name: Import Developer ID certificate (required for notarized releases)
         if: github.event_name == 'release'
         env:
@@ -48,41 +61,38 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
       - name: Build release
-        env:
-          APP_IDENTITY: ${{ secrets.APP_IDENTITY }}
         run: |
-          # build.sh drives the full packaging (including universal binary)
+          # build.sh drives the full packaging (universal binary + app bundle).
+          # It ad-hoc signs only; the Developer ID signature and notarization are
+          # applied in the dedicated step below on release events.
           ./build.sh
 
       - name: Verify app bundle
         run: |
           ./scripts/verify_app_bundle.sh
 
-      - name: Sign app bundle
+      - name: Sign, notarize, and staple
         if: github.event_name == 'release'
         env:
           APP_IDENTITY: ${{ secrets.APP_IDENTITY }}
+          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -euo pipefail
           if [[ -z "${APP_IDENTITY}" ]]; then
             echo "Missing secret: APP_IDENTITY" >&2
             exit 1
           fi
-          APP_BUNDLE="dist/CopyCopy.app"
-          xattr -cr "$APP_BUNDLE" 2>/dev/null || true
-          codesign --force --deep --timestamp --options runtime --sign "$APP_IDENTITY" "$APP_BUNDLE"
-          codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
-          echo "✅ Signed with: $APP_IDENTITY"
-
-      # TODO: Re-enable notarization once Apple Developer agreement is accepted
-      # - name: Notarize and staple
-      #   if: github.event_name == 'release'
-      #   env:
-      #     APP_IDENTITY: ${{ secrets.APP_IDENTITY }}
-      #     APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
-      #     APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-      #     APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-      #   run: ./scripts/sign_and_notarize.sh
+          if [[ -z "${APP_STORE_CONNECT_API_KEY_P8}" || -z "${APP_STORE_CONNECT_KEY_ID}" || -z "${APP_STORE_CONNECT_ISSUER_ID}" ]]; then
+            echo "Missing App Store Connect notarization secrets:" >&2
+            echo "  APP_STORE_CONNECT_API_KEY_P8 / APP_STORE_CONNECT_KEY_ID / APP_STORE_CONNECT_ISSUER_ID" >&2
+            exit 1
+          fi
+          # sign_and_notarize.sh signs Sparkle's nested helpers inside-out, signs
+          # the app with the Developer ID identity, then notarizes and staples the
+          # ticket into the bundle — so the zip created below ships stapled.
+          ./scripts/sign_and_notarize.sh
 
       - name: Package app bundle
         id: package
