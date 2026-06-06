@@ -1,0 +1,137 @@
+/* ============================================================
+   CopyCopy docs — static documentation layout
+   ------------------------------------------------------------
+   Pure static HTML (no docsify, no markdown-at-runtime). Color,
+   font, and spacing tokens come from site.css; this file adds the
+   docs shell: sticky TOC sidebar, prose, code wells, and tables —
+   all in the warm CopyCopy palette. Base resets, body, and the
+   core .nav rules are inherited from site.css.
+   ============================================================ */
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+/* ---- Top nav (extends site.css .nav for the wider docs shell) ---- */
+.nav__inner { max-width: 1180px; }
+.nav__link--active { color: var(--accent); }
+.nav__link svg { width: 15px; height: 15px; vertical-align: -2px; }
+
+/* ---- Layout: TOC sidebar + content ---- */
+.layout {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 var(--space-lg);
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  gap: var(--space-2xl);
+}
+
+.toc {
+  position: sticky;
+  top: calc(56px + var(--space-xl));
+  align-self: start;
+  height: calc(100vh - 56px - var(--space-xl));
+  overflow-y: auto;
+  padding: var(--space-xl) 0;
+}
+.toc__label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: var(--space-md); }
+.toc__list { list-style: none; display: flex; flex-direction: column; gap: 2px; border-left: 1px solid var(--border); }
+.toc__list a { display: block; padding: 5px 0 5px var(--space-md); margin-left: -1px; border-left: 2px solid transparent; font-size: 13px; line-height: 1.4; color: var(--text-secondary); text-decoration: none; transition: color 0.15s var(--ease-out), border-color 0.15s var(--ease-out); }
+.toc__list a:hover { color: var(--text); }
+.toc__list a.is-active { color: var(--accent); border-left-color: var(--accent); font-weight: 500; }
+.toc__list a.toc--sub { padding-left: var(--space-lg); font-size: 12.5px; color: var(--text-tertiary); }
+.toc__list a.toc--sub:hover { color: var(--text-secondary); }
+
+/* ---- Content / prose ---- */
+.content { padding: var(--space-2xl) 0 var(--space-3xl); min-width: 0; }
+.doc { max-width: 760px; }
+.doc__eyebrow { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin-bottom: var(--space-sm); }
+.doc__lead { font-size: 19px; line-height: 1.55; color: var(--text-secondary); margin-bottom: var(--space-xl); }
+.doc__lead a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.doc__lead a:hover { text-decoration: underline; }
+
+.doc h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(34px, 5vw, 48px); line-height: 1.08; letter-spacing: -0.02em; margin-bottom: var(--space-md); }
+.doc h2 { font-family: var(--font-display); font-weight: 400; font-size: 30px; line-height: 1.2; letter-spacing: -0.01em; margin: var(--space-2xl) 0 var(--space-md); padding-top: var(--space-xl); border-top: 1px solid var(--border); scroll-margin-top: 80px; }
+.doc h3 { font-size: 19px; font-weight: 600; margin: var(--space-xl) 0 var(--space-sm); scroll-margin-top: 80px; }
+.doc h4 { font-size: 15px; font-weight: 600; color: var(--text-secondary); margin: var(--space-lg) 0 var(--space-sm); text-transform: none; }
+
+.doc p { font-size: 16px; margin-bottom: var(--space-md); color: var(--text); }
+.doc p.muted { color: var(--text-secondary); }
+.doc a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.doc a:hover { text-decoration: underline; }
+.doc strong { font-weight: 600; }
+
+.doc ul, .doc ol { margin: 0 0 var(--space-md) 0; padding-left: var(--space-lg); }
+.doc li { font-size: 16px; margin-bottom: 6px; line-height: 1.55; }
+.doc li::marker { color: var(--text-tertiary); }
+
+/* Inline code */
+.doc :not(pre) > code {
+  font-family: var(--font-mono); font-size: 0.86em;
+  background: var(--accent-soft); color: var(--accent);
+  padding: 2px 6px; border-radius: var(--radius-xs); white-space: nowrap;
+}
+
+/* Code blocks */
+.codeblock { position: relative; margin: 0 0 var(--space-lg); }
+.codeblock__lang { position: absolute; top: 0; right: 0; font-family: var(--font-mono); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); background: var(--bg); padding: 4px 10px; border: 1px solid var(--border); border-top: none; border-right: none; border-bottom-left-radius: var(--radius-sm); }
+.codeblock pre {
+  font-family: var(--font-mono); font-size: 13.5px; line-height: 1.7;
+  color: var(--text); background: var(--bg-sunken);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: var(--space-md); overflow-x: auto; white-space: pre;
+}
+.codeblock pre code { font: inherit; color: inherit; background: none; padding: 0; white-space: pre; }
+.codeblock__copy {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg-raised); color: var(--text-tertiary);
+  border: 1px solid var(--border); border-radius: var(--radius-xs);
+  cursor: pointer; opacity: 0; transition: opacity 0.15s var(--ease-out), color 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+.codeblock:hover .codeblock__copy { opacity: 1; }
+.codeblock__copy:hover { color: var(--text); border-color: var(--border-strong); }
+.codeblock__copy.is-done { color: var(--success); border-color: color-mix(in srgb, var(--success) 40%, var(--border)); opacity: 1; }
+.codeblock__copy svg { width: 15px; height: 15px; }
+/* Has a language tag → keep copy button clear of it */
+.codeblock--tagged .codeblock__copy { right: 8px; top: 36px; }
+
+/* "Flow" diagram blocks (ASCII pipelines) — softer, no copy button */
+.flow pre { background: var(--bg-raised); color: var(--text-secondary); font-size: 13px; line-height: 1.75; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; margin: 0 0 var(--space-lg); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.doc table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.doc thead th { text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); background: var(--bg-sunken); padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.doc tbody td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); }
+.doc tbody tr:last-child td { border-bottom: none; }
+.doc tbody tr:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.doc td code, .doc th code { white-space: normal; }
+
+/* Callout / note */
+.note { display: flex; gap: var(--space-md); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); border-radius: var(--radius-md); padding: var(--space-md) var(--space-lg); margin: 0 0 var(--space-lg); }
+.note__icon { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+.note__icon svg { width: 18px; height: 18px; }
+.note p { font-size: 14.5px; margin: 0; color: var(--text); }
+.note p + p { margin-top: 6px; }
+
+/* Ordered "how it works" numbered steps */
+.steps { list-style: none; padding: 0; margin-bottom: var(--space-lg); }
+.steps li { position: relative; padding-left: 42px; margin-bottom: var(--space-md); min-height: 28px; }
+.steps li::before { content: attr(data-step); position: absolute; left: 0; top: -1px; width: 28px; height: 28px; border-radius: 50%; background: var(--text); color: var(--bg); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+/* Footer */
+.doc-footer { border-top: 1px solid var(--border); margin-top: var(--space-2xl); padding-top: var(--space-lg); display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-tertiary); }
+.doc-footer a { color: var(--text-tertiary); text-decoration: none; }
+.doc-footer a:hover { color: var(--text); }
+.pager { display: flex; gap: var(--space-md); }
+.pager a { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text-secondary); }
+.pager a:hover { color: var(--accent); }
+.pager a svg { width: 15px; height: 15px; }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; gap: 0; }
+  .toc { display: none; }
+}

@@ -1,81 +1,433 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CopyCopy - Skills Documentation</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/themes/vue.css">
-  <style>
-    :root {
-      --theme-color: #3884ff;
-    }
-    .markdown-section {
-      max-width: 800px;
-    }
-    .sidebar {
-      display: none;
-    }
-    /* Override docsify app-nav completely */
-    body > nav.app-nav {
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      height: 50px;
-      margin: 0 !important;
-      padding: 0 20px !important;
-      background: #0a0a0a;
-      display: flex !important;
-      align-items: center;
-      z-index: 100;
-      border-bottom: 1px solid #222;
-      text-align: left !important;
-    }
-    body > nav.app-nav a {
-      color: #888;
-      text-decoration: none;
-      margin-right: 20px;
-      font-size: 13px;
-      font-family: monospace;
-    }
-    body > nav.app-nav a:hover {
-      color: #fff;
-    }
-    body > nav.app-nav a.brand {
-      color: #fff;
-      font-weight: bold;
-      margin-right: 40px;
-    }
-    /* Push content below fixed nav */
-    body > main#app {
-      padding-top: 60px !important;
-    }
-    section.content {
-      padding-top: 20px !important;
-    }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CopyCopy — Skill Format</title>
+  <meta name="description" content="The SKILL.md reference for CopyCopy: frontmatter, filters, the structured Tools JSON schema, execute functions, and copy-paste examples." />
+  <meta name="theme-color" content="#fafaf8" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#141413" media="(prefers-color-scheme: dark)" />
+  <link rel="stylesheet" href="./site.css" />
+  <link rel="stylesheet" href="./docs.css" />
 </head>
 <body>
-  <nav class="app-nav">
-    <a href="./" class="brand">CopyCopy_</a>
-    <a href="./actions.html">SKILL FORMAT</a>
-    <a href="./default-skills.html">DEFAULT SKILLS</a>
-    <a href="https://github.com/mpuig/copycopy">SRC</a>
-    <a href="https://github.com/mpuig/copycopy/releases/latest">RELEASES</a>
+  <nav class="nav">
+    <div class="nav__inner">
+      <a href="./index.html" class="nav__logo">CopyCopy</a>
+      <div class="nav__links">
+        <a class="nav__link nav__link--active" href="./actions.html">Skill Format</a>
+        <a class="nav__link" href="./default-skills.html">Default Skills</a>
+        <a class="nav__link" href="https://github.com/mpuig/copycopy">Source</a>
+        <a class="nav__link" href="https://github.com/mpuig/copycopy/releases/latest">Releases</a>
+      </div>
+    </div>
   </nav>
-  <main id="app"></main>
-  <script>
-    window.$docsify = {
-      name: 'CopyCopy',
-      loadSidebar: false,
-      loadNavbar: false,
-      homepage: './ACTIONS.md',
-      relativePath: true,
-      notFoundPage: true,
-    }
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify@4"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+
+  <div class="layout">
+    <aside class="toc">
+      <p class="toc__label">On this page</p>
+      <ul class="toc__list">
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#quick-start">Quick start</a></li>
+        <li><a href="#format">SKILL.md format</a></li>
+        <li><a href="#minimal">Minimal example</a></li>
+        <li><a href="#frontmatter">Frontmatter</a></li>
+        <li><a href="#filters" class="toc--sub">Metadata filters</a></li>
+        <li><a href="#content-types" class="toc--sub">Content types</a></li>
+        <li><a href="#source-contexts" class="toc--sub">Source contexts</a></li>
+        <li><a href="#entity-types" class="toc--sub">Entity types</a></li>
+        <li><a href="#legacy">Legacy Actions format</a></li>
+        <li><a href="#tools-json">Structured Tools JSON</a></li>
+        <li><a href="#execute">execute functions</a></li>
+        <li><a href="#reference">Function reference</a></li>
+        <li><a href="#examples">Copy-paste examples</a></li>
+        <li><a href="#built-in">Built-in skills</a></li>
+        <li><a href="#tips">Tips</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+      </ul>
+    </aside>
+
+    <main class="content">
+    <article class="doc">
+      <p class="doc__eyebrow">Documentation</p>
+      <h1 id="overview">Skills</h1>
+      <p class="doc__lead">CopyCopy understands what you copy and where you copied it from, then shows the right next action. Skills define the available actions — both the built-in ones and any you create yourself. For a visual walkthrough, see <a href="./default-skills.html">Default Skills</a>.</p>
+
+      <p>When you double-press <code>⌘C</code>, CopyCopy:</p>
+      <ol class="steps">
+        <li data-step="1">Captures the clipboard content.</li>
+        <li data-step="2">Detects the top-level content type locally: text, URL, image, files, rich text, or unknown.</li>
+        <li data-step="3">Detects entities inside text locally: JSON, Base64, URL-encoded text, HTML, Markdown, code, file path, foreign language, and more.</li>
+        <li data-step="4">Identifies the source app context: browser, email, chat, IDE, terminal, notes, or other.</li>
+        <li data-step="5">Optionally asks the local LLM to add semantic labels for plain text, such as <code>emailDraft</code>, <code>slackDraft</code>, <code>shellCommand</code>, <code>logOutput</code>, or <code>sql</code>.</li>
+        <li data-step="6">Loads skills whose filters match the content type, entities, and source context.</li>
+        <li data-step="7">Ranks actions using source boosts, entity boosts, text length, and usage history.</li>
+        <li data-step="8">Shows the best actions in the floating panel.</li>
+      </ol>
+      <p class="muted">After an action runs, CopyCopy creates a new context from the result, excludes redundant actions, shows immediate heuristic follow-ups, and optionally uses the local LLM plus memory to reorder follow-ups.</p>
+      <div class="note"><span class="note__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg></span><div><p>Source context and entities strongly influence ranking: copying JSON surfaces <code>Format JSON</code>; copying a terminal error surfaces <code>Explain Error</code>; copying from chat surfaces <code>Draft Reply</code> or <code>Action Items</code>; copying article HTML surfaces <code>Smart Markdown</code>.</p></div></div>
+
+      <h2 id="quick-start">Quick start</h2>
+      <p>Create a folder under <code>~/.copycopy/skills/</code> and put a <code>SKILL.md</code> file inside it:</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">bash</span><pre><code>mkdir -p ~/.copycopy/skills/my-skill
+open ~/.copycopy/skills/my-skill</code></pre></div>
+      <p>Then create:</p>
+      <div class="codeblock"><pre><code>~/.copycopy/skills/my-skill/SKILL.md</code></pre></div>
+      <p>Restart CopyCopy after editing a skill. If your folder name matches a built-in skill id such as <code>summarize</code> or <code>explain-code</code>, your file overrides the bundled one.</p>
+
+      <h2 id="format">SKILL.md format</h2>
+      <p>The recommended format is YAML frontmatter plus a body.</p>
+      <ul>
+        <li>If the body is <code>toolName(args)</code>, the skill runs a safe built-in function.</li>
+        <li>Otherwise, the body is treated as an on-device LLM system prompt.</li>
+      </ul>
+      <p class="muted">If you are starting from scratch, copy one of the built-in exported skill files and modify it.</p>
+
+      <h2 id="minimal">Minimal skill example</h2>
+      <h3>LLM prompt skill</h3>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">SKILL.md</span><pre><code>---
+name: Fix Grammar
+description: Fix grammar
+icon: checkmark.bubble
+content-types: text
+text-source: clipboardChatCleaned
+temperature: 0
+source-boosts:
+  email: 80
+  notes: 80
+---
+
+Fix grammar, spelling, and punctuation.
+Rules:
+- Preserve meaning, tone, formatting, and language
+- Do not rewrite correct sentences
+- Output only the corrected text</code></pre></div>
+      <h3>Function skill</h3>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">SKILL.md</span><pre><code>---
+name: Format JSON
+description: Pretty-print JSON
+icon: curlybraces
+content-types: text
+entity-types: json
+---
+
+formatJSON({clipboardTrimmed})</code></pre></div>
+
+      <h2 id="frontmatter">Frontmatter</h2>
+      <p>Every skill needs YAML frontmatter at the top.</p>
+      <h4>Required</h4>
+      <ul><li><code>name</code></li><li><code>description</code></li></ul>
+      <h4>Optional</h4>
+      <ul>
+        <li><code>icon</code></li><li><code>content-types</code></li><li><code>entity-types</code></li>
+        <li><code>source-contexts</code></li><li><code>text-source</code></li><li><code>minimum-chars</code></li>
+        <li><code>maximum-chars</code></li><li><code>temperature</code></li><li><code>source-boosts</code></li>
+      </ul>
+
+      <h3 id="filters">Metadata filters</h3>
+      <p>You can filter when a skill activates using <code>content-types</code>, <code>entity-types</code>, and <code>source-contexts</code>.</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">yaml</span><pre><code>content-types: text
+entity-types: json, base64
+source-contexts: terminal</code></pre></div>
+      <p>Legacy <code>metadata</code> keys are still accepted for backward compatibility:</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">yaml</span><pre><code>metadata:
+  content_types: [ text ]
+  entity_types: [ json, base64 ]
+  source_contexts: [ terminal ]</code></pre></div>
+
+      <h3 id="content-types">Content types</h3>
+      <ul><li><code>text</code></li><li><code>url</code></li><li><code>image</code></li><li><code>files</code></li></ul>
+      <p class="muted">If you omit <code>content-types</code>, the skill can match any clipboard kind.</p>
+
+      <h3 id="source-contexts">Source contexts</h3>
+      <ul><li><code>browser</code></li><li><code>ide</code></li><li><code>terminal</code></li><li><code>email</code></li><li><code>chat</code></li><li><code>notes</code></li></ul>
+      <p>Source context determines the app where you pressed <code>⌘C</code>. It influences ranking: actions scoped to the current source appear first, but all matching actions remain available. If you omit <code>source-contexts</code>, the skill can match any app source.</p>
+
+      <h3 id="entity-types">Common entity types</h3>
+      <ul>
+        <li><code>json</code>, <code>base64</code>, <code>urlEncoded</code>, <code>html</code>, <code>markdown</code>, <code>codeSnippet</code></li>
+        <li><code>email</code>, <code>phoneNumber</code>, <code>address</code>, <code>placeName</code>, <code>coordinates</code></li>
+        <li><code>filePath</code>, <code>gitSha</code>, <code>ipAddress</code>, <code>currency</code></li>
+        <li><code>foreignLanguage</code>, <code>emailDraft</code>, <code>slackDraft</code></li>
+        <li><code>shellCommand</code>, <code>logOutput</code>, <code>sql</code></li>
+      </ul>
+
+      <h2 id="legacy">Legacy <code>## Actions</code> format</h2>
+      <p>CopyCopy still supports the older readable <code>## Actions</code> format, but new skills should use the frontmatter+body format shown above. Each action starts with a <code>### action-id</code> block.</p>
+      <h3>Prompt action</h3>
+      <p>Use this for AI-powered actions — rewriting, summarization, translation, grammar fixes, and code explanation. These run on the on-device Gemma 4 E2B model. The result is copied to the clipboard automatically.</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">SKILL.md</span><pre><code>### summarize
+
+type: prompt
+prompt: Summarize the clipboard text into 3-5 bullet points. Preserve the main point and the most important supporting details. Omit filler and repetition. Return only the summary.
+icon: text.redaction
+description: Summarize Content</code></pre></div>
+      <p>You can scope prompt actions to a source context or an entity type:</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">SKILL.md</span><pre><code>### explain-code
+
+type: prompt
+prompt: Explain what this code does in plain language. Be brief and focus on the purpose, not line-by-line detail.
+icon: doc.text.magnifyingglass
+description: Explain Code
+entity_types: [codeSnippet]</code></pre></div>
+      <h3>Function action</h3>
+      <p>Use this for URL opening, built-in transforms, file actions, and similar non-prompt tools:</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">SKILL.md</span><pre><code>### decode-base64
+
+type: function
+function: decodeBase64
+icon: arrow.down.doc
+description: Decode Base64
+entity_types: [base64]</code></pre></div>
+      <h4>Supported <code>function:</code> values</h4>
+      <ul><li><code>openURL</code></li><li><code>copyToClipboard</code></li><li><code>revealInFinder</code></li><li><code>openFile</code></li><li><code>saveImage</code></li><li><code>saveTempFile</code></li><li><code>stripANSI</code></li><li><code>htmlToMarkdown</code></li><li><code>formatJSON</code></li><li><code>decodeBase64</code></li><li><code>decodeURL</code></li></ul>
+      <h4>Template variables</h4>
+      <p>The readable format supports these variables in <code>template:</code> fields:</p>
+      <ul><li><code>{text}</code></li><li><code>{text:encoded}</code></li><li><code>{text:trimmed}</code></li><li><code>{path}</code></li><li><code>{charcount}</code></li><li><code>{linecount}</code></li></ul>
+
+      <h2 id="tools-json">Structured <code>## Tools</code> JSON format</h2>
+      <p>This format is stricter and maps directly to CopyCopy's internal tool schema.</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">json</span><pre><code>[
+  {
+    "id": "pretty-json",
+    "name": "Pretty Print JSON",
+    "description": "Pretty Print JSON",
+    "icon": "curlybraces",
+    "execute": "formatJSON",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "json": {
+          "type": "string",
+          "description": "Clipboard JSON",
+          "source": "clipboard"
+        }
+      },
+      "required": ["json"]
+    },
+    "entityTypes": ["json"]
+  }
+]</code></pre></div>
+      <h3>Tool fields</h3>
+      <ul>
+        <li><code>id</code>: stable identifier inside the skill</li>
+        <li><code>name</code>: human-readable name</li>
+        <li><code>description</code>: menu title shown to the user</li>
+        <li><code>icon</code>: SF Symbol name</li>
+        <li><code>execute</code>: built-in function name</li>
+        <li><code>parameters</code>: JSON schema-like object definition</li>
+        <li><code>entityTypes</code>: optional action-level entity filter</li>
+        <li><code>sourceContexts</code>: optional action-level source-app filter</li>
+      </ul>
+      <h3>Supported parameter <code>source</code> values</h3>
+      <ul>
+        <li><code>literal</code> — uses the property's own <code>value</code></li>
+        <li><code>clipboard</code> — raw clipboard text</li>
+        <li><code>clipboardLLM</code> — preprocessed clipboard text for LLM input (HTML extraction, chrome stripping, sanitization). <strong>Use this for all prompt actions.</strong></li>
+        <li><code>clipboardHTML</code> — raw clipboard HTML, falls back to plain text</li>
+        <li><code>clipboardURL</code> — clipboard URL as a string</li>
+        <li><code>clipboardTrimmed</code> — clipboard text with leading/trailing whitespace removed</li>
+        <li><code>filePaths</code> — newline-joined file paths</li>
+        <li><code>charCount</code> — character count as a string</li>
+        <li><code>lineCount</code> — line count as a string</li>
+      </ul>
+
+      <h2 id="execute">Available <code>execute</code> functions</h2>
+      <h3>URLs and apps</h3>
+      <ul>
+        <li><code>openURL</code> — Open a validated clipboard URL directly.</li>
+        <li><code>openURLTemplate</code> — Build a URL from <code>baseURL</code>, <code>path</code>, query parameters, and <code>fragment</code>.</li>
+        <li><code>openStaticURL</code> — Open a fixed URL from parameters.</li>
+        <li><code>openApp</code> — Open an allowlisted app and optionally copy prepared text. Supported apps include ChatGPT, Claude, Cursor, Copilot, and Safari.</li>
+      </ul>
+      <h3>Files and clipboard</h3>
+      <ul><li><code>openFile</code></li><li><code>revealInFinder</code></li><li><code>saveImage</code></li><li><code>saveTempFile</code></li><li><code>copyToClipboard</code></li></ul>
+      <h3>Local transforms</h3>
+      <ul>
+        <li><code>formatJSON</code> — Validate and pretty-print JSON.</li>
+        <li><code>decodeBase64</code> — Decode Base64 and copy the result.</li>
+        <li><code>decodeURL</code> — Decode percent-encoded text and copy the result.</li>
+        <li><code>stripANSI</code> — Remove ANSI escape codes and copy the result.</li>
+        <li><code>htmlToMarkdown</code> — Convert clipboard HTML to Markdown using the content extraction pipeline.</li>
+        <li><code>htmlToMarkdownLLM</code> — Convert clipboard HTML to Markdown, then clean it with the local model.</li>
+      </ul>
+      <h3>Path utilities</h3>
+      <ul>
+        <li><code>revealPath</code> — Resolve and validate a file path, then reveal it in Finder.</li>
+        <li><code>openInTerminal</code> — Resolve and validate a file path, then open it in Terminal.</li>
+      </ul>
+      <h3>AI tools</h3>
+      <ul><li><code>llmPrompt</code> — Run a prompt against the on-device Gemma 4 E2B model with separate system and user roles. The result is copied to the clipboard. Use <code>clipboardLLM</code> as the prompt source for code and <code>clipboardChatCleaned</code> for chat/email.</li></ul>
+
+      <h2 id="reference">Function reference</h2>
+      <h3><code>llmPrompt</code></h3>
+      <p>The primary AI tool. Use this for summarization, translation, rewriting, grammar fixes, code explanation, and any other prompt-based transformation.</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">json</span><pre><code>{
+  "execute": "llmPrompt",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "systemPrompt": {
+        "type": "string",
+        "description": "Instruction for the model",
+        "source": "literal",
+        "value": "Fix the grammar and spelling in the clipboard text. Preserve the original meaning and tone. Return only the corrected text."
+      },
+      "prompt": {
+        "type": "string",
+        "description": "Clipboard text",
+        "source": "clipboardLLM"
+      }
+    },
+    "required": ["systemPrompt", "prompt"]
+  }
+}</code></pre></div>
+      <h4>Tips for writing system prompts</h4>
+      <ul>
+        <li>Be direct: "Fix grammar" not "You are a grammar assistant who..."</li>
+        <li>Specify what to return: "Return only the corrected text" prevents the model from adding commentary.</li>
+        <li>Keep it short: the on-device model responds better to concise instructions.</li>
+        <li>The input is truncated at ~3000 characters. For longer content, summarization works better than detailed rewriting.</li>
+      </ul>
+      <h3><code>openURLTemplate</code></h3>
+      <p>Build a URL safely from <code>baseURL</code>, <code>path</code>, query parameters, and <code>fragment</code>.</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">json</span><pre><code>{
+  "execute": "openURLTemplate",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "baseURL": { "type": "string", "description": "Search URL", "source": "literal", "value": "https://duckduckgo.com/" },
+      "q": { "type": "string", "description": "Search query", "source": "clipboard" }
+    },
+    "required": ["baseURL", "q"]
+  }
+}</code></pre></div>
+      <h3><code>htmlToMarkdown</code></h3>
+      <p>Convert clipboard HTML to Markdown. Uses the content extraction pipeline to strip navigation, ads, and boilerplate before converting.</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">json</span><pre><code>{
+  "execute": "htmlToMarkdown",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "html": { "type": "string", "description": "Clipboard HTML", "source": "clipboardHTML" }
+    },
+    "required": ["html"]
+  }
+}</code></pre></div>
+
+      <h2 id="examples">Copy-paste examples</h2>
+      <h3>1 · Fix grammar (prompt)</h3>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">SKILL.md</span><pre><code>---
+name: writing
+description: Fix and improve copied text
+metadata:
+  content_types: [ text ]
+---
+
+# Writing
+
+## Actions
+
+### fix-grammar
+
+type: prompt
+prompt: Fix the grammar and spelling in the clipboard text. Preserve the original meaning and tone. Return only the corrected text.
+icon: textformat.abc
+description: Fix Grammar</code></pre></div>
+      <h3>2 · Rewrite email draft (prompt, scoped to email apps)</h3>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">SKILL.md</span><pre><code>---
+name: email
+description: Polish email drafts
+metadata:
+  content_types: [ text ]
+  source_contexts: [ email ]
+---
+
+# Email
+
+## Actions
+
+### rewrite-email
+
+type: prompt
+prompt: Rewrite the clipboard text as a polished email reply draft. Preserve the original intent and key facts. Improve clarity, tone, and grammar. Return only the rewritten email body.
+icon: envelope.badge
+description: Polish email draft</code></pre></div>
+      <h3>3 · Strip ANSI codes (function, scoped to terminal)</h3>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">SKILL.md</span><pre><code>---
+name: terminal-tools
+description: Clean up terminal output
+metadata:
+  content_types: [ text ]
+  source_contexts: [ terminal ]
+---
+
+# Terminal Tools
+
+## Actions
+
+### strip-ansi
+
+type: function
+function: stripANSI
+icon: textformat
+description: Remove terminal colors</code></pre></div>
+
+      <h2 id="built-in">Built-in skills</h2>
+      <p>CopyCopy ships with focused built-in skills:</p>
+      <ul>
+        <li><code>open-url</code> — Open copied URLs.</li>
+        <li><code>read-article</code> — Fetch a URL and extract readable article content.</li>
+        <li><code>clean-text</code> — Normalize copied text locally.</li>
+        <li><code>smart-markdown</code> — Convert article HTML to clean Markdown with local AI cleanup.</li>
+        <li><code>format-json</code>, <code>decode-base64</code>, <code>decode-url</code>, <code>strip-ansi</code> — Deterministic local transforms.</li>
+        <li><code>fix-grammar</code>, <code>summarize</code>, <code>translate</code>, <code>rewrite-email</code> — On-device AI text transforms.</li>
+        <li><code>draft-chat-reply</code>, <code>extract-action-items</code> — Contextual chat/email/notes actions.</li>
+        <li><code>explain-terminal-error</code>, <code>explain-code</code> — Developer and terminal helpers.</li>
+        <li><code>open-file</code>, <code>reveal-in-finder</code>, <code>reveal-path</code>, <code>open-terminal</code> — File and path actions.</li>
+      </ul>
+      <p class="muted">On startup, built-ins are exported to <code>~/.copycopy/skills/</code> as editable Markdown files. A custom folder with the same id overrides the bundled skill.</p>
+
+      <h2 id="tips">Tips</h2>
+      <ul>
+        <li>Start from an exported built-in skill instead of writing one from scratch.</li>
+        <li>Use <code>type: prompt</code> for AI-powered actions. Use <code>type: function</code> for everything else.</li>
+        <li>Use <code>source_contexts</code> to surface actions in the right app context.</li>
+        <li>Use <code>entity_types</code> to keep the action panel clean.</li>
+        <li>Use <code>clipboardLLM</code> as the source for prompt actions — it preprocesses the input.</li>
+        <li>Keep system prompts short and direct.</li>
+        <li>Restart CopyCopy after changing <code>SKILL.md</code>.</li>
+      </ul>
+
+      <h2 id="troubleshooting">Troubleshooting</h2>
+      <h3>My skill does not show up</h3>
+      <ul>
+        <li>the folder is under <code>~/.copycopy/skills/</code></li>
+        <li>the file is named exactly <code>SKILL.md</code></li>
+        <li>frontmatter has both <code>name</code> and <code>description</code></li>
+        <li>JSON under <code>## Tools</code> is valid</li>
+        <li>your filters actually match the current clipboard content</li>
+      </ul>
+      <h3>My tool shows but does nothing</h3>
+      <ul>
+        <li>the URL scheme is not allowlisted</li>
+        <li>the app name is not allowlisted for <code>openApp</code></li>
+        <li>the path does not exist for <code>revealPath</code> or <code>openInTerminal</code></li>
+        <li>the clipboard content does not match the expected source</li>
+      </ul>
+      <h3>Debugging</h3>
+      <p>Enable the Debug tab:</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">bash</span><pre><code>defaults write com.copycopy.app debugMenuEnabled -bool true</code></pre></div>
+      <p>Then relaunch CopyCopy and inspect the current clipboard kind, detected entity, source context, and event-tap state.</p>
+
+      <div class="doc-footer">
+        <span>CopyCopy · MIT</span>
+        <div class="pager"><a href="./default-skills.html">Default Skills <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg></a></div>
+      </div>
+    </article>
+    </main>
+  </div>
+
+  <script src="./docs.js"></script>
 </body>
 </html>

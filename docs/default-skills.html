@@ -1,86 +1,221 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CopyCopy - Default Skills</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/themes/vue.css">
-  <style>
-    :root {
-      --theme-color: #3884ff;
-    }
-    .markdown-section {
-      max-width: 900px;
-    }
-    .sidebar {
-      display: none;
-    }
-    body > nav.app-nav {
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      height: 50px;
-      margin: 0 !important;
-      padding: 0 20px !important;
-      background: #0a0a0a;
-      display: flex !important;
-      align-items: center;
-      z-index: 100;
-      border-bottom: 1px solid #222;
-      text-align: left !important;
-    }
-    body > nav.app-nav a {
-      color: #888;
-      text-decoration: none;
-      margin-right: 20px;
-      font-size: 13px;
-      font-family: monospace;
-    }
-    body > nav.app-nav a:hover {
-      color: #fff;
-    }
-    body > nav.app-nav a.brand {
-      color: #fff;
-      font-weight: bold;
-      margin-right: 40px;
-    }
-    body > main#app {
-      padding-top: 60px !important;
-    }
-    section.content {
-      padding-top: 20px !important;
-    }
-    .markdown-section table {
-      display: table;
-      width: 100%;
-    }
-    .markdown-section code {
-      white-space: pre-wrap;
-    }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CopyCopy — Default Skills</title>
+  <meta name="description" content="CopyCopy's built-in skills: how clipboard content, entities, and source apps decide which actions appear in the floating panel." />
+  <meta name="theme-color" content="#fafaf8" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#141413" media="(prefers-color-scheme: dark)" />
+  <link rel="stylesheet" href="./site.css" />
+  <link rel="stylesheet" href="./docs.css" />
 </head>
 <body>
-  <nav class="app-nav">
-    <a href="./" class="brand">CopyCopy_</a>
-    <a href="./actions.html">SKILL FORMAT</a>
-    <a href="./default-skills.html">DEFAULT SKILLS</a>
-    <a href="https://github.com/mpuig/copycopy">SRC</a>
-    <a href="https://github.com/mpuig/copycopy/releases/latest">RELEASES</a>
+  <nav class="nav">
+    <div class="nav__inner">
+      <a href="./index.html" class="nav__logo">CopyCopy</a>
+      <div class="nav__links">
+        <a class="nav__link" href="./actions.html">Skill Format</a>
+        <a class="nav__link nav__link--active" href="./default-skills.html">Default Skills</a>
+        <a class="nav__link" href="https://github.com/mpuig/copycopy">Source</a>
+        <a class="nav__link" href="https://github.com/mpuig/copycopy/releases/latest">Releases</a>
+      </div>
+    </div>
   </nav>
-  <main id="app"></main>
-  <script>
-    window.$docsify = {
-      name: 'CopyCopy',
-      loadSidebar: false,
-      loadNavbar: false,
-      homepage: './DEFAULT_SKILLS.md',
-      relativePath: true,
-      notFoundPage: true,
-    }
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify@4"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js"></script>
+
+  <div class="layout">
+    <aside class="toc">
+      <p class="toc__label">On this page</p>
+      <ul class="toc__list">
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#appears">How a skill appears</a></li>
+        <li><a href="#content-types">Content types</a></li>
+        <li><a href="#entity-types">Entity types</a></li>
+        <li><a href="#source-contexts">Source contexts</a></li>
+        <li><a href="#boosts">How source boosts work</a></li>
+        <li><a href="#matrix">Default skill matrix</a></li>
+        <li><a href="#reading">Reading a definition</a></li>
+        <li><a href="#follow-ups">Pipeline follow-ups</a></li>
+        <li><a href="#custom">Tips for custom skills</a></li>
+      </ul>
+    </aside>
+
+    <main class="content">
+    <article class="doc">
+      <p class="doc__eyebrow">Documentation</p>
+      <h1 id="overview">Default Skills</h1>
+      <p class="doc__lead">CopyCopy's default skills are the built-in actions shown in the floating panel. They are intentionally small, focused, and local-first: deterministic tools handle exact transforms, while the local Gemma model handles language tasks.</p>
+
+      <h2 id="appears">How a skill appears</h2>
+      <div class="codeblock flow"><pre><code>Copied content
+  ↓
+Top-level kind      URL · files · image · text · rich text
+  ↓
+Detected entities   json · base64 · html · codeSnippet · logOutput · sql · emailDraft · …
+  ↓
+Source context      browser · email · chat · notes · IDE · terminal · other
+  ↓
+Skill filters       content-types + entity-types + source-contexts
+  ↓
+Ranking             source boost + entity boost + length boost + usage history
+  ↓
+Floating panel      best next actions first</code></pre></div>
+      <p>Two things are important:</p>
+      <ol>
+        <li><strong>Filters decide eligibility.</strong> A skill with <code>entity-types: json</code> only appears when JSON is detected.</li>
+        <li><strong>Boosts decide order.</strong> A browser-specific boost can move <code>Smart Markdown</code> above generic text actions.</li>
+      </ol>
+
+      <h2 id="content-types">Content types</h2>
+      <p><code>content-types</code> are broad clipboard buckets. They answer: "what kind of thing was copied?"</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Content type</th><th>What it means</th><th>Example skills</th></tr></thead>
+        <tbody>
+          <tr><td><code>url</code></td><td>A copied <code>http</code> or <code>https</code> URL</td><td>Open URL, Read Article</td></tr>
+          <tr><td><code>files</code></td><td>One or more file URLs from Finder</td><td>Open File, Reveal in Finder</td></tr>
+          <tr><td><code>image</code></td><td>Clipboard image data</td><td>Custom image skills</td></tr>
+          <tr><td><code>text</code></td><td>Plain or rich text content</td><td>Most text, AI, and local transform skills</td></tr>
+        </tbody>
+      </table></div>
+      <div class="codeblock flow"><pre><code>URL      → Open URL · Read Article · Decode URL
+Files    → Open File · Reveal in Finder
+Text     → Clean Text · Format JSON · Summarize · Explain Code · …
+Image    → custom image actions</code></pre></div>
+
+      <h2 id="entity-types">Entity types</h2>
+      <p><code>entity-types</code> are narrower signals inside text. They answer: "what does this text look like?"</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Entity</th><th>Typical input</th><th>Best default actions</th></tr></thead>
+        <tbody>
+          <tr><td><code>json</code></td><td><code>{ "ok": true }</code></td><td>Format JSON</td></tr>
+          <tr><td><code>base64</code></td><td><code>TW9kZWwgbG9hZGVk...</code></td><td>Decode Base64</td></tr>
+          <tr><td><code>urlEncoded</code></td><td><code>local%20llm%20clipboard</code></td><td>Decode URL</td></tr>
+          <tr><td><code>html</code></td><td><code>&lt;article&gt;&lt;h1&gt;…</code></td><td>Smart Markdown</td></tr>
+          <tr><td><code>markdown</code></td><td><code># Title — - Item</code></td><td>Summarize, Action Items</td></tr>
+          <tr><td><code>codeSnippet</code></td><td>Functions, classes, imports</td><td>Explain Code</td></tr>
+          <tr><td><code>shellCommand</code></td><td><code>swift build</code>, <code>curl ...</code></td><td>Explain Error, Explain Code</td></tr>
+          <tr><td><code>logOutput</code></td><td>Stack traces, terminal errors</td><td>Explain Error, Strip ANSI</td></tr>
+          <tr><td><code>sql</code></td><td><code>SELECT ... FROM ...</code></td><td>Explain Code</td></tr>
+          <tr><td><code>foreignLanguage</code></td><td>Non-English text</td><td>Translate</td></tr>
+          <tr><td><code>emailDraft</code></td><td>Email-like draft text</td><td>Rewrite Email</td></tr>
+          <tr><td><code>filePath</code></td><td><code>/Users/marc/file.txt</code></td><td>Reveal Path, Open in Terminal</td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted">Detection is local and deterministic first. If the local model is already loaded, CopyCopy may add semantic labels like <code>emailDraft</code>, <code>shellCommand</code>, <code>logOutput</code>, or <code>sql</code> for plain text.</p>
+
+      <h2 id="source-contexts">Source contexts</h2>
+      <p><code>source-contexts</code> and <code>source-boosts</code> use the app where you copied from. They answer: "where did this come from?"</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Source</th><th>Typical apps</th><th>Strong default actions</th></tr></thead>
+        <tbody>
+          <tr><td><code>browser</code></td><td>Safari, Chrome, Arc</td><td>Read Article, Smart Markdown, Format JSON</td></tr>
+          <tr><td><code>email</code></td><td>Mail, Outlook</td><td>Rewrite Email, Fix Grammar, Action Items</td></tr>
+          <tr><td><code>chat</code></td><td>Slack, Messages, Discord</td><td>Draft Reply, Action Items, Summarize</td></tr>
+          <tr><td><code>notes</code></td><td>Notes, Obsidian, Notion</td><td>Fix Grammar, Action Items, Smart Markdown</td></tr>
+          <tr><td><code>ide</code></td><td>Xcode, VS Code, JetBrains</td><td>Explain Code, Format JSON</td></tr>
+          <tr><td><code>terminal</code></td><td>Terminal, iTerm, Warp</td><td>Explain Error, Strip ANSI, Decode Base64</td></tr>
+          <tr><td><code>other</code></td><td>Anything else</td><td>Generic local/text actions</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="boosts">How source boosts work</h2>
+      <p>Each skill can add a <code>source-boosts</code> map. Higher numbers move the skill up for that source app.</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">yaml</span><pre><code>source-boosts:
+  terminal: 150</code></pre></div>
+      <p>A terminal error copied from Terminal gets roughly this kind of ordering:</p>
+      <div class="codeblock flow"><pre><code>Explain Error       +150 source · +40 entity · history → top
+Strip ANSI          +120 source · +40 entity           → high
+Explain Code         +70 source · +40 entity           → useful fallback
+Clean Text           no entity boost                   → generic fallback
+Translate            no matching entity                → hidden or low</code></pre></div>
+      <p>A chat copied from Slack gets a different order:</p>
+      <div class="codeblock flow"><pre><code>Draft Reply         +150 source · length boost          → top for short chat
+Action Items        +110 source · length boost          → top for longer chat/notes
+Summarize           +110 source · length boost          → strong for long chat
+Clean Text           +45 source                         → generic fallback</code></pre></div>
+
+      <h2 id="matrix">Default skill matrix</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Skill</th><th>Kind</th><th>Main filters</th><th>Strongest sources</th><th>Execution</th></tr></thead>
+        <tbody>
+          <tr><td><code>Open URL</code></td><td>URL utility</td><td><code>content-types: url</code></td><td>chat, email, notes, other</td><td>Local tool</td></tr>
+          <tr><td><code>Read Article</code></td><td>URL/article</td><td><code>content-types: url</code></td><td>browser</td><td>Network fetch + extraction</td></tr>
+          <tr><td><code>Clean Text</code></td><td>Text cleanup</td><td><code>content-types: text</code></td><td>browser, email, chat, notes</td><td>Local tool</td></tr>
+          <tr><td><code>Smart Markdown</code></td><td>HTML/article cleanup</td><td><code>content-types: text</code>, <code>entity-types: html, markdown</code></td><td>browser, notes</td><td>HTML converter + local model</td></tr>
+          <tr><td><code>Format JSON</code></td><td>Structured data</td><td><code>entity-types: json</code></td><td>browser, IDE, terminal</td><td>Local tool</td></tr>
+          <tr><td><code>Decode Base64</code></td><td>Encoding</td><td><code>entity-types: base64</code></td><td>terminal, browser, IDE</td><td>Local tool</td></tr>
+          <tr><td><code>Decode URL</code></td><td>URL escaping</td><td><code>content-types: text, url</code></td><td>browser, terminal, IDE</td><td>Local tool</td></tr>
+          <tr><td><code>Strip ANSI</code></td><td>Terminal cleanup</td><td><code>entity-types: logOutput, shellCommand</code>, <code>source-contexts: terminal</code></td><td>terminal</td><td>Local tool</td></tr>
+          <tr><td><code>Fix Grammar</code></td><td>Writing</td><td><code>content-types: text</code></td><td>email, notes</td><td>Local model</td></tr>
+          <tr><td><code>Summarize</code></td><td>Summary</td><td><code>content-types: text</code>, <code>minimum-chars: 200</code></td><td>chat, email, notes, browser</td><td>Local model</td></tr>
+          <tr><td><code>Translate</code></td><td>Translation</td><td><code>entity-types: foreignLanguage</code></td><td>browser, chat, email, notes</td><td>Local model</td></tr>
+          <tr><td><code>Draft Reply</code></td><td>Chat reply</td><td><code>source-contexts: chat</code></td><td>chat</td><td>Local model</td></tr>
+          <tr><td><code>Rewrite Email</code></td><td>Email polish</td><td><code>entity-types: emailDraft</code></td><td>email</td><td>Local model</td></tr>
+          <tr><td><code>Action Items</code></td><td>Extraction</td><td><code>minimum-chars: 100</code></td><td>chat, email, notes</td><td>Local model</td></tr>
+          <tr><td><code>Explain Error</code></td><td>Terminal help</td><td><code>entity-types: logOutput, shellCommand</code>, <code>source-contexts: terminal</code></td><td>terminal</td><td>Local model</td></tr>
+          <tr><td><code>Explain Code</code></td><td>Developer help</td><td><code>entity-types: codeSnippet, shellCommand, sql</code></td><td>IDE, terminal</td><td>Local model</td></tr>
+          <tr><td><code>Open File</code></td><td>File utility</td><td><code>content-types: files</code></td><td>any</td><td>Local tool</td></tr>
+          <tr><td><code>Reveal in Finder</code></td><td>File utility</td><td><code>content-types: files</code></td><td>any</td><td>Local tool</td></tr>
+          <tr><td><code>Reveal Path</code></td><td>Path utility</td><td><code>entity-types: filePath</code></td><td>any</td><td>Local tool</td></tr>
+          <tr><td><code>Open in Terminal</code></td><td>Path utility</td><td><code>entity-types: filePath</code></td><td>any</td><td>Local tool</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="reading">Reading a skill definition</h2>
+      <p>A default skill is just a <code>SKILL.md</code> file with frontmatter and a body.</p>
+      <div class="codeblock codeblock--tagged"><span class="codeblock__lang">SKILL.md</span><pre><code>---
+name: Explain Error
+description: Explain terminal error
+icon: exclamationmark.triangle
+content-types: text
+entity-types: logOutput, shellCommand
+source-contexts: terminal
+text-source: clipboardLLM
+temperature: 0
+source-boosts:
+  terminal: 150
+---
+
+Explain the terminal error.
+Rules:
+- Identify the likely cause first
+- Give the smallest practical fix next
+- Use 2-4 concise bullets</code></pre></div>
+      <p>What each part does:</p>
+      <div class="codeblock flow"><pre><code>content-types      broad clipboard kind required to show the skill
+entity-types       specific detected labels required to show the skill
+source-contexts    app category required to show the skill
+source-boosts      ranking boost when copied from that source
+text-source        how input is prepared before calling the local model
+temperature        creativity; 0 is deterministic, higher is more varied
+body               tool call or local-model system prompt</code></pre></div>
+
+      <h2 id="follow-ups">Pipeline follow-ups</h2>
+      <p>After an action runs, CopyCopy builds a new context from the result and suggests follow-ups.</p>
+      <div class="codeblock flow"><pre><code>HTML article
+  → Smart Markdown
+  → result is Markdown
+  → follow-ups: Summarize · Action Items · Clean Text</code></pre></div>
+      <p class="muted">CopyCopy avoids repeating redundant actions, logs the action chain, and uses memory/history to improve future follow-up ordering.</p>
+
+      <h2 id="custom">Tips for custom skills</h2>
+      <ul>
+        <li>Start with a narrow filter. Prefer <code>entity-types</code> and <code>source-contexts</code> over showing a skill for all text.</li>
+        <li>Use local tools for exact transforms: JSON, Base64, URL decoding, ANSI stripping, paths.</li>
+        <li>Use local model prompts for language tasks: summarize, rewrite, translate, explain.</li>
+        <li>Keep prompts short and rule-based.</li>
+        <li>Set <code>temperature: 0</code> for extraction, classification, explanations, and format-sensitive output.</li>
+        <li>Add <code>source-boosts</code> only where the action is genuinely more useful.</li>
+      </ul>
+
+      <div class="doc-footer">
+        <span>CopyCopy · MIT</span>
+        <div class="pager"><a href="./actions.html"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4L6 8l4 4"/></svg> Skill Format</a></div>
+      </div>
+    </article>
+    </main>
+  </div>
+
+  <script src="./docs.js"></script>
 </body>
 </html>
