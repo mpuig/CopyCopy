@@ -43,7 +43,9 @@ final class AppSettings: ObservableObject {
         self.doubleCopyThresholdMs = stored > 0 ? stored : 280
 
         self.llmEnabled = UserDefaults.standard.object(forKey: "llmEnabled") as? Bool ?? true
-        self.llmModel = UserDefaults.standard.string(forKey: "llmModel") ?? ModelDefinition.defaultId
+        let storedModel = UserDefaults.standard.string(forKey: "llmModel")
+        self.llmModel = storedModel.flatMap(ModelDefinition.find)?.id ?? ModelDefinition.defaultId
+        UserDefaults.standard.set(llmModel, forKey: "llmModel")
 
         syncLaunchAtLoginState()
     }

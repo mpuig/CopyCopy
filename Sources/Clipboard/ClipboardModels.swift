@@ -266,7 +266,11 @@ struct ClipboardContext: Sendable {
     }
 
     /// Create a synthetic context from a result text (for pipeline follow-ups).
-    static func fromResultText(_ text: String, classifier: ClipboardClassifier) -> ClipboardContext {
+    static func fromResultText(
+        _ text: String,
+        classifier: ClipboardClassifier,
+        copyEvent: CopyKeyEvent? = nil
+    ) -> ClipboardContext {
         let entity = classifier.detectEntity(from: text)
         let entities: [DetectedEntityType] = entity == .none ? [] : [entity]
 
@@ -277,6 +281,6 @@ struct ClipboardContext: Sendable {
             plainText: text,
             detectedEntities: entities
         )
-        return ClipboardContext(copyEvent: nil, snapshot: snapshot, capturedAt: CACurrentMediaTime())
+        return ClipboardContext(copyEvent: copyEvent, snapshot: snapshot, capturedAt: CACurrentMediaTime())
     }
 }

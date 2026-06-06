@@ -29,6 +29,7 @@ struct SettingsView: View {
                     .tag(SettingsTab.debug)
             }
         }
+        .tint(.ccAccent)
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
         .frame(minWidth: 500, idealWidth: 550, minHeight: 450, idealHeight: 550)

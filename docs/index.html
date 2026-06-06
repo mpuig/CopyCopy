@@ -29,7 +29,8 @@
       <div class="nav__inner">
         <a href="/" class="nav__logo">CopyCopy</a>
         <div class="nav__links">
-          <a href="./actions.html" class="nav__link">Docs</a>
+        <a href="./actions.html" class="nav__link">Skill Format</a>
+        <a href="./default-skills.html" class="nav__link">Default Skills</a>
           <a href="https://github.com/mpuig/copycopy" class="nav__link">Source</a>
           <a href="https://github.com/mpuig/copycopy/releases/latest" class="nav__link">Releases</a>
         </div>
@@ -39,19 +40,87 @@
     <main>
 
       <!-- Hero -->
-      <section class="hero container">
-        <p class="hero__eyebrow animate-in">Double ⌘C</p>
-        <h1 class="hero__title animate-in animate-in--delay-1">
-          Transform anything<br>you copy.
-        </h1>
-        <p class="hero__subtitle animate-in animate-in--delay-2">
-          Double-press ⌘C. Your clipboard understands what you copied, suggests the right action, and learns from your choices. Summarize, translate, rewrite, explain — all on your Mac.
-        </p>
-        <div class="hero__actions animate-in animate-in--delay-3">
-          <a class="btn btn--primary" href="https://github.com/mpuig/copycopy/releases/latest">Download</a>
-          <a class="btn btn--secondary" href="https://github.com/mpuig/copycopy">View Source</a>
+      <section class="hero container" id="top">
+        <div class="hero__copy">
+          <p class="hero__eyebrow animate-in">Copy twice · Act instantly</p>
+          <h1 class="hero__title animate-in animate-in--delay-1">
+            Transform anything<br>you copy.
+          </h1>
+          <p class="hero__subtitle animate-in animate-in--delay-2">
+            Double-press ⌘C. Your clipboard understands what you copied, suggests the right action, and learns from your choices — all on your Mac.
+          </p>
+          <div class="hero__actions animate-in animate-in--delay-3">
+            <a class="btn btn--primary" href="https://github.com/mpuig/copycopy/releases/latest">Download</a>
+            <a class="btn btn--secondary" href="https://github.com/mpuig/copycopy">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              View Source
+            </a>
+          </div>
+          <div class="hero__proof animate-in animate-in--delay-4">
+            <span>Free &amp; open source · MIT</span>
+            <span class="hero__proof-sep"></span>
+            <span>macOS 14+</span>
+          </div>
         </div>
-        <p class="hero__req animate-in animate-in--delay-4">macOS 14+ (Sonoma) · Apple Silicon & Intel · MIT License</p>
+
+        <div class="hero__demo-col animate-in animate-in--delay-2">
+          <div class="herodemo" aria-hidden="true">
+            <div class="herodemo__window">
+              <div class="herodemo__bar">
+                <span class="hd-dot hd-dot--r"></span><span class="hd-dot hd-dot--y"></span><span class="hd-dot hd-dot--g"></span>
+                <span class="herodemo__title">copycopy — swift build</span>
+              </div>
+              <div class="herodemo__body"><span class="hd-cmt">$ swift build</span>
+<span class="hd-sel">error: cannot find 'LlamaContext' in scope
+  --&gt; Sources/LLM/LocalLLMService.swift:42</span>
+<span class="hd-cmt">$ </span><span class="hd-caret"></span></div>
+            </div>
+
+            <div class="herodemo__hint">
+              <kbd>⌘C</kbd><kbd>⌘C</kbd><span>double-press</span>
+            </div>
+
+            <div class="herodemo__panel">
+              <div class="hd-list">
+                <div class="hd-header">
+                  <span class="hd-header__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7l4 4-4 4 M11 15h6"/></svg></span>
+                  <span class="hd-header__desc">Terminal output • error (118 chars)</span>
+                </div>
+                <div class="hd-divider"></div>
+                <div class="hd-row hd-row--sel">
+                  <span class="hd-row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 8h6v3a3 3 0 01-6 0z M9 11a6 6 0 0012 0 M5 11h2 M17 11h2 M8 3l1.5 1.5 M16 3l-1.5 1.5"/></svg></span>
+                  <span class="hd-row__body"><span class="hd-row__title">Explain Error</span><span class="hd-row__sub">contextual ai</span></span>
+                  <span class="hd-row__ret">↵</span>
+                </div>
+                <div class="hd-row">
+                  <span class="hd-row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l1.4 4L17 9l-3.6 1L12 14l-1.4-4L7 9l3.6-1z M18 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span>
+                  <span class="hd-row__body"><span class="hd-row__title">Summarize</span><span class="hd-row__sub">ai transform</span></span>
+                  <span class="hd-row__ret">↵</span>
+                </div>
+                <div class="hd-row">
+                  <span class="hd-row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7l4 4-4 4 M11 15h6"/></svg></span>
+                  <span class="hd-row__body"><span class="hd-row__title">Strip ANSI Codes</span><span class="hd-row__sub">local tool</span></span>
+                  <span class="hd-row__ret">↵</span>
+                </div>
+              </div>
+
+              <div class="hd-exec">
+                <div class="hd-current">
+                  <span class="hd-current__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 8h6v3a3 3 0 01-6 0z M9 11a6 6 0 0012 0 M5 11h2 M17 11h2 M8 3l1.5 1.5 M16 3l-1.5 1.5"/></svg></span>
+                  <span class="hd-current__tt">Explain Error</span>
+                  <span class="hd-spinner"></span>
+                  <span class="hd-current__chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+                </div>
+                <div class="hd-result"></div>
+                <div class="hd-clip">
+                  <span class="hd-clip__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2 M9 5a2 2 0 002 2h2a2 2 0 002-2 M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></span>
+                  <span class="hd-clip__label">Copied to clipboard</span>
+                  <span class="hd-kbd">⌘V</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- Install -->
@@ -60,14 +129,18 @@
           <p class="install__label">Install</p>
           <div class="install__methods">
 
-            <div class="install__method">
+            <div class="install__method reveal">
               <p class="install__method-title">Homebrew</p>
               <div class="install__code">
                 <code>brew tap mpuig/copycopy<br>brew install --cask copycopy</code>
+                <button class="install__copy" type="button" aria-label="Copy to clipboard" title="Copy" data-copy="brew tap mpuig/copycopy&#10;brew install --cask copycopy">
+                  <svg class="install__copy-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1A1.5 1.5 0 011 9V2.5A1.5 1.5 0 012.5 1H9a1.5 1.5 0 011.5 1.5v1"/></svg>
+                  <svg class="install__copy-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4.5L6.5 11 3 7.5"/></svg>
+                </button>
               </div>
             </div>
 
-            <div class="install__method">
+            <div class="install__method reveal">
               <p class="install__method-title">Manual download</p>
               <p class="install__method-desc">
                 Download <a href="https://github.com/mpuig/copycopy/releases/latest">the latest release</a>, unzip, and drag CopyCopy.app to your Applications folder.
@@ -100,25 +173,20 @@
         <div class="container">
           <p class="how__label">How it works</p>
           <div class="how__steps">
-            <div class="step">
+            <div class="step reveal">
               <div class="step__number">1</div>
-              <p class="step__title">Copy</p>
-              <p class="step__desc">Copy anything with ⌘C as you normally do.</p>
+              <p class="step__title">Select</p>
+              <p class="step__desc">Select text, a URL, code, logs, a file, or anything else you want to act on.</p>
             </div>
-            <div class="step">
+            <div class="step reveal">
               <div class="step__number">2</div>
-              <p class="step__title">Double-press</p>
-              <p class="step__desc">Press ⌘C again. A floating panel appears near your cursor.</p>
+              <p class="step__title">Copy Copy</p>
+              <p class="step__desc">Press ⌘C twice. CopyCopy reads the clipboard context and opens near your cursor.</p>
             </div>
-            <div class="step">
+            <div class="step reveal">
               <div class="step__number">3</div>
               <p class="step__title">Pick an action</p>
-              <p class="step__desc">Choose from context-aware suggestions. Results stream in real time.</p>
-            </div>
-            <div class="step">
-              <div class="step__number">4</div>
-              <p class="step__title">Keep going</p>
-              <p class="step__desc">Follow-up actions appear below the result. Chain steps: Markdown → Summarize → Translate.</p>
+              <p class="step__desc">Choose the best ranked action, then keep going with contextual follow-ups.</p>
             </div>
           </div>
         </div>
@@ -129,8 +197,11 @@
         <h2 class="scenarios__heading">It knows what you need</h2>
         <div class="scenarios__grid">
 
-          <div class="scenario">
-            <span class="scenario__source">Copied from Mail</span>
+          <div class="scenario reveal">
+            <div class="scenario__head">
+              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18v14H3z M3 6l9 7 9-7"/></svg></span>
+              <span class="scenario__source">Copied from Mail</span>
+            </div>
             <div class="scenario__content">"Hey, just wanted to follow up on the thing we discussed re: the timeline for..."</div>
             <div class="scenario__arrow">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
@@ -139,8 +210,11 @@
             <div class="scenario__action">Rewrite Email</div>
           </div>
 
-          <div class="scenario">
-            <span class="scenario__source">Copied from Safari</span>
+          <div class="scenario reveal">
+            <div class="scenario__head">
+              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z M16 8l-2.5 5.5L8 16l2.5-5.5z"/></svg></span>
+              <span class="scenario__source">Copied from Safari</span>
+            </div>
             <div class="scenario__content">&lt;article class="post"&gt;&lt;h1&gt;Understanding Transformers&lt;/h1&gt;...</div>
             <div class="scenario__arrow">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
@@ -149,8 +223,11 @@
             <div class="scenario__action">Smart Markdown</div>
           </div>
 
-          <div class="scenario">
-            <span class="scenario__source">Copied from VS Code</span>
+          <div class="scenario reveal">
+            <div class="scenario__head">
+              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7l-5 5 5 5 M15 7l5 5-5 5"/></svg></span>
+              <span class="scenario__source">Copied from VS Code</span>
+            </div>
             <div class="scenario__content">async function fetchUser(id) { const res = await fetch(`/api/users/${id}`)...</div>
             <div class="scenario__arrow">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
@@ -159,8 +236,11 @@
             <div class="scenario__action">Explain Code</div>
           </div>
 
-          <div class="scenario">
-            <span class="scenario__source">Copied from Slack</span>
+          <div class="scenario reveal">
+            <div class="scenario__head">
+              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9h8a2 2 0 010 4H6a2 2 0 010-4z M10 6v8 M14 11a2 2 0 01-4 0"/></svg></span>
+              <span class="scenario__source">Copied from Slack</span>
+            </div>
             <div class="scenario__content">The meeting notes from today: we agreed to push the release to next sprint and...</div>
             <div class="scenario__arrow">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
@@ -169,8 +249,11 @@
             <div class="scenario__action">Summarize</div>
           </div>
 
-          <div class="scenario">
-            <span class="scenario__source">Copied foreign text</span>
+          <div class="scenario reveal">
+            <div class="scenario__head">
+              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7 M7 4v1c0 3-1.5 6-4 8 M5 9c0 2 2 4 5 5 M13 19l4-9 4 9 M14.5 16h5"/></svg></span>
+              <span class="scenario__source">Copied foreign text</span>
+            </div>
             <div class="scenario__content">Les modifications apportées au système de gestion des données permettent une...</div>
             <div class="scenario__arrow">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
@@ -179,8 +262,11 @@
             <div class="scenario__action">Translate</div>
           </div>
 
-          <div class="scenario">
-            <span class="scenario__source">Copied a URL</span>
+          <div class="scenario reveal">
+            <div class="scenario__head">
+              <span class="scenario__appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z M2 12h20 M12 2a15 15 0 010 20 M12 2a15 15 0 000 20"/></svg></span>
+              <span class="scenario__source">Copied a URL</span>
+            </div>
             <div class="scenario__content">https://example.com/blog/how-to-build-ai-agents-from-scratch</div>
             <div class="scenario__arrow">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M8 13l-3-3M8 13l3-3"/></svg>
@@ -197,32 +283,32 @@
         <p class="features__label">Built for this</p>
         <div class="features__grid">
 
-          <div class="feature">
+          <div class="feature reveal">
             <p class="feature__title">On-device AI</p>
-            <p class="feature__desc">Summarize, translate, rewrite, and explain code using local GGUF models with Metal GPU acceleration. No API keys, no cloud.</p>
+            <p class="feature__desc">Summarize, translate, rewrite, and explain code using a local Gemma 4 E2B GGUF model with Metal GPU acceleration. No API keys, no cloud.</p>
           </div>
 
-          <div class="feature">
+          <div class="feature reveal">
             <p class="feature__title">Learns from you</p>
             <p class="feature__desc">Remembers which actions you use and when. The AI suggests smarter follow-ups based on your patterns over time.</p>
           </div>
 
-          <div class="feature">
+          <div class="feature reveal">
             <p class="feature__title">Pipeline actions</p>
-            <p class="feature__desc">Chain multiple steps: Markdown → Summarize → Translate. AI picks the best follow-ups — skips useless ones automatically.</p>
+            <p class="feature__desc">Chain multiple steps: Smart Markdown → Summarize → Action Items. Heuristics show instant follow-ups; local AI can reorder them.</p>
           </div>
 
-          <div class="feature">
-            <p class="feature__title">Multiple models</p>
-            <p class="feature__desc">Choose from LFM, Gemma, or Qwen models. Download from the menu bar. Switch instantly. Metal GPU accelerated.</p>
+          <div class="feature reveal">
+            <p class="feature__title">Action harness</p>
+            <p class="feature__desc">Detects clipboard type, entities, and source app; ranks matching skills with usage history; executes only what you choose.</p>
           </div>
 
-          <div class="feature">
+          <div class="feature reveal">
             <p class="feature__title">Extensible</p>
             <p class="feature__desc">Create custom SKILL.md files with your own prompts or tool calls. Override any built-in skill.</p>
           </div>
 
-          <div class="feature">
+          <div class="feature reveal">
             <p class="feature__title">Native & lightweight</p>
             <p class="feature__desc">SwiftUI menu bar app with frosted glass UI. No Electron, no web views, no background daemon.</p>
           </div>
@@ -281,6 +367,105 @@
         </div>
       </div>
     </footer>
+
+    <script>
+      (function () {
+        var html = document.documentElement;
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        /* Scroll reveals — enable the hidden start-state only now that JS runs,
+           so the page stays fully visible if this script never loads. */
+        var reveals = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+        if (reveals.length) {
+          html.classList.add('js-reveal');
+          if (reduce || !('IntersectionObserver' in window)) {
+            reveals.forEach(function (el) { el.classList.add('reveal--in'); });
+          } else {
+            var io = new IntersectionObserver(function (entries) {
+              entries.forEach(function (e) {
+                if (e.isIntersecting) { e.target.classList.add('reveal--in'); io.unobserve(e.target); }
+              });
+            }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+            reveals.forEach(function (el) {
+              if (el.getBoundingClientRect().top < (window.innerHeight || 0) + 80) {
+                el.classList.add('reveal--in');
+              } else {
+                io.observe(el);
+              }
+            });
+          }
+        }
+
+        /* Copy-to-clipboard buttons (a wink for a clipboard app). */
+        Array.prototype.slice.call(document.querySelectorAll('[data-copy]')).forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var text = btn.getAttribute('data-copy') || '';
+            var done = function () {
+              btn.classList.add('install__copy--done');
+              setTimeout(function () { btn.classList.remove('install__copy--done'); }, 1600);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(done).catch(done);
+            } else {
+              done();
+            }
+          });
+        });
+
+        /* Hero demo — looping double-⌘C panel. */
+        var demo = document.querySelector('.herodemo');
+        if (demo) {
+          var rows = demo.querySelectorAll('.hd-row');
+          var resultEl = demo.querySelector('.hd-result');
+          var RESULT = 'The build failed because the llama.cpp framework was not linked. Use ./build_xcode.sh to build the full app bundle.';
+          var timers = [];
+          var stream = null;
+
+          function clearAll() {
+            timers.forEach(clearTimeout);
+            timers = [];
+            if (stream) { clearInterval(stream); stream = null; }
+          }
+          function push(fn, ms) { timers.push(setTimeout(fn, ms)); }
+          function setSel(i) {
+            for (var j = 0; j < rows.length; j++) {
+              rows[j].classList.toggle('hd-row--sel', j === i);
+            }
+          }
+
+          if (reduce) {
+            /* Respect reduced motion: hold a static finished state, no loop. */
+            demo.setAttribute('data-phase', '3');
+            setSel(0);
+            resultEl.textContent = RESULT;
+          } else {
+            (function cycle() {
+              clearAll();
+              demo.setAttribute('data-phase', '0');
+              setSel(0);
+              resultEl.textContent = '';
+              push(function () { demo.setAttribute('data-phase', '1'); }, 1100);
+              push(function () { setSel(1); }, 1900);
+              push(function () { setSel(0); }, 2500);
+              push(function () {
+                demo.setAttribute('data-phase', '2');
+                var i = 0;
+                stream = setInterval(function () {
+                  i += 2;
+                  resultEl.textContent = RESULT.slice(0, i);
+                  if (i >= RESULT.length) {
+                    clearInterval(stream);
+                    stream = null;
+                    demo.setAttribute('data-phase', '3');
+                  }
+                }, 22);
+              }, 3100);
+              push(cycle, 8200);
+            })();
+          }
+        }
+      })();
+    </script>
 
   </body>
 </html>

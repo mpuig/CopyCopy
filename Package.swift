@@ -38,8 +38,8 @@ let package = Package(
         ),
         .binaryTarget(
             name: "LlamaFramework",
-            url: "https://github.com/ggml-org/llama.cpp/releases/download/b8670/llama-b8670-xcframework.zip",
-            checksum: "79aeecd75edc7fbe48c0ad66b786f5ea34923d3772ce3bcd39ef69449e8d921c"
+            url: "https://github.com/ggml-org/llama.cpp/releases/download/b9542/llama-b9542-xcframework.zip",
+            checksum: "10763c95e9c43b5d92d9f5a2f733d156695adfc11d014b1d76ae19906148cb4d"
         ),
         .testTarget(
             name: "CopyCopyTests",

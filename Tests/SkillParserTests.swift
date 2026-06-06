@@ -269,7 +269,7 @@ final class SkillParserTests: XCTestCase {
 
         XCTAssertEqual(skill.executeFunction, .llmPrompt)
         XCTAssertEqual(skill.parameters.properties["prompt"]?.source, "clipboardLLM")
-        XCTAssertEqual(skill.description, "Explain what this code does")
+        XCTAssertEqual(skill.description, "Explain code")
     }
 
     func testBuiltInReadArticleSkill() throws {
@@ -287,9 +287,9 @@ final class SkillParserTests: XCTestCase {
     }
 
     func testBuiltInHTMLToMarkdownSkill() throws {
-        let skill = try SkillParser.parse(id: "html-to-markdown", content: BuiltInSkills.htmlToMarkdown, isBuiltIn: true)
+        let skill = try SkillParser.parse(id: "smart-markdown", content: BuiltInSkills.smartMarkdown, isBuiltIn: true)
 
-        XCTAssertEqual(skill.executeFunction, .htmlToMarkdown)
+        XCTAssertEqual(skill.executeFunction, .htmlToMarkdownLLM)
         XCTAssertEqual(skill.sourceBoosts?["browser"], 120)
     }
 
@@ -311,7 +311,7 @@ final class SkillParserTests: XCTestCase {
         let skill = try SkillParser.parse(id: "summarize", content: BuiltInSkills.summarize, isBuiltIn: true)
 
         XCTAssertEqual(skill.executeFunction, .summarize)
-        XCTAssertEqual(skill.minimumCharacterCount, 300)
+        XCTAssertEqual(skill.minimumCharacterCount, 200)
     }
 
     // MARK: - Agent Skills (LLM with tools)

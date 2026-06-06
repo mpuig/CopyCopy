@@ -71,6 +71,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>SUFeedURL</key><string>https://copycopy.app/appcast.xml</string>
 </dict>
 </plist>
 PLIST

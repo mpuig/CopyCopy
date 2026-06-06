@@ -1,19 +1,19 @@
 # CopyCopy
 
-Transform anything you copy.
+Copy twice. Act instantly.
 
-CopyCopy is a macOS menu bar app that transforms your clipboard with on-device AI. Double-press ⌘C and a floating panel suggests the right action — summarize, translate, rewrite, explain code — then chain follow-ups into a pipeline. It learns from your choices and gets smarter over time. Nothing leaves your Mac.
+CopyCopy is a local action harness for your clipboard. Double-press ⌘C and it understands what you copied, detects where it came from, ranks the best next actions, and optionally runs private on-device AI transforms. It learns from the actions you choose and gets more useful over time.
 
 ## Features
 
-- **On-device AI** — Summarize, translate, rewrite, explain code, and more using local GGUF models with Metal GPU acceleration. No API keys, no cloud.
-- **Pipeline actions** — Chain multiple steps: convert HTML → Markdown → Summarize → Translate. Each result feeds the next action with contextual follow-ups.
-- **Smart content detection** — Recognizes URLs, code snippets, file paths, foreign languages, email drafts, and 20+ content types.
-- **Learns from you** — Logs every action to `~/.copycopy/memory/`. The AI reads your patterns and suggests smarter follow-ups over time.
-- **Multiple models** — Choose from LFM, Gemma 4, or Qwen models. Download and switch from the menu bar.
+- **Action clipboard** — Copy text, URLs, files, code, logs, chats, JSON, or articles and get ranked next actions.
+- **Smart content understanding** — Uses deterministic local detection first, then optional local LLM semantic classification for plain text.
+- **On-device AI** — Summarize, translate, rewrite, explain code, and clean content using a local Gemma 4 E2B GGUF model with Metal acceleration.
+- **Pipeline actions** — Chain multiple steps: Smart Markdown → Summarize → Action Items. Each result feeds contextual follow-ups.
+- **Learns from you** — Usage history boosts actions you repeatedly choose; memory logs action patterns for smarter follow-up suggestions.
 - **Extensible skills** — Create custom `SKILL.md` files in `~/.copycopy/skills/` to add your own actions or override built-ins.
 - **Double-⌘C trigger** — Configurable threshold. No always-on popup or clipboard history.
-- **Privacy first** — No telemetry, no clipboard history, no network calls. Everything runs on your Mac.
+- **Privacy first** — No telemetry, no cloud AI, no clipboard history. Clipboard transforms run locally unless you explicitly choose a network action such as fetching a URL or downloading a model.
 
 ## Requirements
 
@@ -61,20 +61,33 @@ swift build
 2. Press ⌘C again within the configured threshold.
 3. Pick an action from the floating panel.
 
-The suggested actions depend on what you copied and where you copied it from. Copying from a mail client surfaces "Rewrite Email Draft" at the top; copying from a terminal surfaces "Strip ANSI Codes"; copying from a browser offers "HTML to Markdown" and "Summarize."
+The suggested actions depend on what you copied, where you copied it from, and what you usually choose. Copying JSON surfaces `Format JSON`; copying a terminal error surfaces `Explain Error`; copying chat text surfaces `Draft Reply` or `Action Items`; copying article HTML surfaces `Smart Markdown`.
+
+## How actions are decided
+
+CopyCopy uses a local harness pipeline:
+
+1. Captures the clipboard after double-⌘C.
+2. Detects top-level content locally: URL, files, image, plain text, rich text, or unknown.
+3. Detects local entities: JSON, Base64, URL-encoded text, HTML, Markdown, code, file path, foreign language, and more.
+4. Detects source context from the app: browser, email, chat, notes, IDE, terminal, or other.
+5. Optionally asks the local LLM to add semantic labels for plain text, such as `emailDraft`, `slackDraft`, `shellCommand`, `logOutput`, or `sql`.
+6. Matches skills by `content-types`, `entity-types`, and `source-contexts`.
+7. Ranks matching actions with source boosts, entity boosts, text length, and usage history.
+8. Shows the best actions in the floating panel.
+
+After an action runs, CopyCopy builds a new context from the result, excludes redundant actions, shows heuristic follow-ups immediately, and optionally uses the local LLM plus memory to reorder follow-ups.
 
 ## Built-in skills
 
-| Skill | What it does |
+For a visual explanation of default skills, content types, entity filters, and source boosts, see [Default Skills](https://copycopy.app/default-skills.html).
+
+| Skill area | Examples |
 |-------|-------------|
-| **Transform** | Summarize, translate, rewrite email/Slack drafts, fix grammar (on-device LLM) |
-| **Text** | Search the web, convert HTML to Markdown |
-| **Code** | Format JSON, decode Base64/URL encoding, open as temp file |
-| **URLs** | Open copied URLs |
-| **Files** | Open or reveal copied files |
-| **Images** | Save clipboard images |
-| **Places** | Open addresses and coordinates in Maps |
-| **Filesystem** | Reveal file paths in Finder, open in Terminal |
+| **Local tools** | Open URL, clean text, format JSON, decode Base64, decode URL escapes, strip ANSI colors |
+| **AI transforms** | Smart Markdown, fix grammar, summarize, translate to English, rewrite email |
+| **Contextual AI** | Draft chat replies, extract action items, explain terminal errors, explain code/SQL/shell commands |
+| **Files** | Open files, reveal files in Finder, reveal copied paths, open paths in Terminal |
 
 ## Custom skills
 
@@ -108,9 +121,8 @@ defaults write com.copycopy.app debugMenuEnabled -bool true
 
 ```text
 Sources/
-├── Actions/      # Legacy custom-action model and storage
 ├── Clipboard/    # Event tap, pasteboard monitoring, classification, text preprocessing
-├── LLM/          # Local and remote summarization services
+├── LLM/          # Local Gemma/llama.cpp loading, download, generation, classification
 ├── Settings/     # Settings UI and app settings
 ├── Skills/       # Skill models, parser, validator, loader, executor
 ├── Suggestions/  # Suggested action display model
@@ -127,8 +139,8 @@ Sources/
 
 - No telemetry.
 - No clipboard history persisted by the app.
-- Clipboard content stays local unless you explicitly configure a remote LLM.
-- The default AI path is the on-device LFM 2.5 model.
+- Clipboard content stays local unless you explicitly run a network action such as `Read Article`.
+- The default AI path is the on-device Gemma 4 E2B model.
 
 ## Troubleshooting
 

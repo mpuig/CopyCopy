@@ -1,17 +1,23 @@
 # Skills
 
-CopyCopy understands what you copy and where you copied it from, then shows the right action. Skills define the available actions — both the built-in ones and any you create yourself.
+CopyCopy understands what you copy and where you copied it from, then shows the right next action. Skills define the available actions — both the built-in ones and any you create yourself.
+
+For a visual walkthrough of the built-in skills, content types, entity filters, and source boosts, see [Default Skills](./default-skills.html).
 
 When you double-press ⌘C, CopyCopy:
 
 1. Captures the clipboard content.
-2. Detects the content type: text, URL, image, or files.
-3. Detects entities inside text: JSON, address, code snippet, foreign language, and more.
-4. Identifies the source app: browser, email client, chat, IDE, terminal, or notes.
-5. Loads matching skills and ranks actions by relevance to your context.
-6. Shows the best actions in the floating panel.
+2. Detects the top-level content type locally: text, URL, image, files, rich text, or unknown.
+3. Detects entities inside text locally: JSON, Base64, URL-encoded text, HTML, Markdown, code, file path, foreign language, and more.
+4. Identifies the source app context: browser, email, chat, IDE, terminal, notes, or other.
+5. Optionally asks the local LLM to add semantic labels for plain text, such as `emailDraft`, `slackDraft`, `shellCommand`, `logOutput`, or `sql`.
+6. Loads skills whose filters match the content type, entities, and source context.
+7. Ranks actions using source boosts, entity boosts, text length, and usage history.
+8. Shows the best actions in the floating panel.
 
-Actions that transform content — rewrite, summarize, format — are ranked higher than actions that just open a URL. Source context adjusts the ranking: copying from a mail client surfaces "Rewrite Email Draft" at the top; copying from a terminal surfaces "Strip ANSI Codes."
+After an action runs, CopyCopy creates a new context from the result, excludes redundant actions, shows immediate heuristic follow-ups, and optionally uses the local LLM plus memory to reorder follow-ups.
+
+Source context and entities strongly influence ranking: copying JSON surfaces `Format JSON`; copying a terminal error surfaces `Explain Error`; copying from chat surfaces `Draft Reply` or `Action Items`; copying article HTML surfaces `Smart Markdown`.
 
 ## Quick Start
 
@@ -30,48 +36,53 @@ Then create:
 
 Restart CopyCopy after editing a skill.
 
-If your folder name matches a built-in skill id such as `text` or `code`, your file overrides the bundled one.
+If your folder name matches a built-in skill id such as `summarize` or `explain-code`, your file overrides the bundled one.
 
-## Two Supported Formats
+## SKILL.md format
 
-CopyCopy supports **both** of these `SKILL.md` styles:
+The recommended format is YAML frontmatter plus a body.
 
-1. **Readable `## Actions` format** — Easiest to hand-edit. This is what CopyCopy exports to `~/.copycopy/skills/`.
-2. **Structured `## Tools` JSON format** — The canonical internal format. Use it if you need explicit schemas and typed parameters.
+- If the body is `toolName(args)`, the skill runs a safe built-in function.
+- Otherwise, the body is treated as an on-device LLM system prompt.
 
 If you are starting from scratch, copy one of the built-in exported skill files and modify it.
 
 ## Minimal Skill Example
 
+LLM prompt skill:
+
 ```markdown
 ---
-name: my-skill
-description: Rewrite and fix copied text with AI
-compatibility: macOS 14+
-metadata:
-  content_types: [ text ]
+name: Fix Grammar
+description: Fix grammar
+icon: checkmark.bubble
+content-types: text
+text-source: clipboardChatCleaned
+temperature: 0
+source-boosts:
+  email: 80
+  notes: 80
 ---
 
-# My Skill
+Fix grammar, spelling, and punctuation.
+Rules:
+- Preserve meaning, tone, formatting, and language
+- Do not rewrite correct sentences
+- Output only the corrected text
+```
 
-Activates for general text on the clipboard.
+Function skill:
 
-## Actions
+```markdown
+---
+name: Format JSON
+description: Pretty-print JSON
+icon: curlybraces
+content-types: text
+entity-types: json
+---
 
-### fix-grammar
-
-type: prompt
-prompt: Fix the grammar and spelling in the clipboard text. Preserve the original meaning and tone. Return only the corrected text.
-icon: textformat.abc
-description: Fix Grammar
-
-### rewrite-email
-
-type: prompt
-prompt: Rewrite the clipboard text as a polished email reply draft. Preserve the original intent and key facts. Return only the rewritten email body.
-icon: envelope.badge
-description: Rewrite Email Draft
-source_contexts: [email]
+formatJSON({clipboardTrimmed})
 ```
 
 ## Frontmatter
@@ -85,33 +96,39 @@ Required:
 
 Optional:
 
-- `compatibility`
-- `metadata`
+- `icon`
+- `content-types`
+- `entity-types`
+- `source-contexts`
+- `text-source`
+- `minimum-chars`
+- `maximum-chars`
+- `temperature`
+- `source-boosts`
 
 ### Metadata filters
 
 You can filter when a skill activates using:
 
-- `content_types`
-- `entity_types`
-- `source_contexts`
+- `content-types`
+- `entity-types`
+- `source-contexts`
 
-Readable/exported style:
+Example:
+
+```yaml
+content-types: text
+entity-types: json, base64
+source-contexts: terminal
+```
+
+Legacy `metadata` keys are still accepted for backward compatibility:
 
 ```yaml
 metadata:
   content_types: [ text ]
   entity_types: [ json, base64 ]
   source_contexts: [ terminal ]
-```
-
-Structured namespaced style also works:
-
-```yaml
-metadata:
-  copycopy-content-types: "text"
-  copycopy-entity-types: "json,base64"
-  copycopy-source-contexts: "terminal"
 ```
 
 ### Content types
@@ -121,7 +138,7 @@ metadata:
 - `image`
 - `files`
 
-If you omit `content_types`, the skill can match any clipboard kind.
+If you omit `content-types`, the skill can match any clipboard kind.
 
 ### Source contexts
 
@@ -134,7 +151,7 @@ If you omit `content_types`, the skill can match any clipboard kind.
 
 Source context determines the app where you pressed ⌘C. It influences action ranking: actions scoped to the current source appear first, but all matching actions remain available.
 
-If you omit `source_contexts`, the skill can match any app source.
+If you omit `source-contexts`, the skill can match any app source.
 
 ### Common entity types
 
@@ -144,13 +161,15 @@ If you omit `source_contexts`, the skill can match any app source.
 - `foreignLanguage`, `emailDraft`, `slackDraft`
 - `shellCommand`, `logOutput`, `sql`
 
-## Readable `## Actions` Format
+## Legacy `## Actions` Format
+
+CopyCopy still supports the older readable `## Actions` format, but new skills should use the frontmatter+body format shown above.
 
 Each action starts with a `### action-id` block.
 
 ### Prompt action
 
-Use this for AI-powered actions — rewriting, summarization, translation, grammar fixes, and code explanation. These run on the on-device LFM 2.5 model. The result is copied to the clipboard automatically.
+Use this for AI-powered actions — rewriting, summarization, translation, grammar fixes, and code explanation. These run on the on-device Gemma 4 E2B model. The result is copied to the clipboard automatically.
 
 The model works best with clear, direct system prompts. Tell it what to do and what to return — avoid complex multi-step instructions.
 
@@ -316,6 +335,7 @@ Each property may include:
 - `decodeURL` — Decode percent-encoded text and copy the result.
 - `stripANSI` — Remove ANSI escape codes and copy the result.
 - `htmlToMarkdown` — Convert clipboard HTML to Markdown using the content extraction pipeline.
+- `htmlToMarkdownLLM` — Convert clipboard HTML to Markdown, then clean it with the local model.
 
 ### Path utilities
 
@@ -324,7 +344,7 @@ Each property may include:
 
 ### AI tools
 
-- `llmPrompt` — Run a prompt against the on-device LFM 2.5 model with separate system and user roles. The result is copied to the clipboard. Use `clipboardLLM` as the prompt source for best results.
+- `llmPrompt` — Run a prompt against the on-device Gemma 4 E2B model with separate system and user roles. The result is copied to the clipboard. Use `clipboardLLM` as the prompt source for code and `clipboardChatCleaned` for chat/email.
 
 ## Function Reference
 
@@ -480,7 +500,7 @@ metadata:
 type: prompt
 prompt: Rewrite the clipboard text as a polished email reply draft. Preserve the original intent and key facts. Improve clarity, tone, and grammar. Return only the rewritten email body.
 icon: envelope.badge
-description: Rewrite Email Draft
+description: Polish email draft
 ```
 
 ### 4. Strip ANSI codes (function, scoped to terminal)
@@ -503,7 +523,7 @@ metadata:
 type: function
 function: stripANSI
 icon: textformat
-description: Strip ANSI Codes
+description: Remove terminal colors
 ```
 
 ### 5. Format JSON (function, scoped to entity)
@@ -532,18 +552,19 @@ entity_types: [json]
 
 ## Built-in Skills
 
-CopyCopy ships with these built-in skills:
+CopyCopy ships with focused built-in skills:
 
-- `urls` — Open copied URLs
-- `files` — Open or reveal copied files
-- `images` — Save clipboard images
-- `text` — Search the web, convert HTML to Markdown
-- `places` — Open addresses and coordinates in Maps
-- `code` — Format JSON, decode Base64/URL encoding, open as temp file
-- `transform` — Summarize, translate, rewrite email/Slack, fix grammar (on-device LLM)
-- `filesystem` — Reveal file paths in Finder, open in Terminal
+- `open-url` — Open copied URLs.
+- `read-article` — Fetch a URL and extract readable article content.
+- `clean-text` — Normalize copied text locally.
+- `smart-markdown` — Convert article HTML to clean Markdown with local AI cleanup.
+- `format-json`, `decode-base64`, `decode-url`, `strip-ansi` — Deterministic local transforms.
+- `fix-grammar`, `summarize`, `translate`, `rewrite-email` — On-device AI text transforms.
+- `draft-chat-reply`, `extract-action-items` — Contextual chat/email/notes actions.
+- `explain-terminal-error`, `explain-code` — Developer and terminal helpers.
+- `open-file`, `reveal-in-finder`, `reveal-path`, `open-terminal` — File and path actions.
 
-On startup, these are exported to `~/.copycopy/skills/` as readable Markdown files.
+On startup, built-ins are exported to `~/.copycopy/skills/` as editable Markdown files. A custom folder with the same id overrides the bundled skill.
 
 ## Tips
 

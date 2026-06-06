@@ -56,6 +56,12 @@ struct MenuContentView: View {
 
     private var modelSection: some View {
         VStack(alignment: .leading, spacing: 2) {
+            if !downloadingModels.isEmpty {
+                ForEach(downloadingModels) { def in
+                    downloadStatusRow(def)
+                }
+            }
+
             ForEach(downloadedModels) { def in
                 Button {
                     settings.llmModel = def.id
@@ -72,15 +78,51 @@ struct MenuContentView: View {
                 .buttonStyle(.plain)
             }
 
-            if downloadedModels.isEmpty {
-                Text("No models downloaded")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if downloadedModels.isEmpty && downloadingModels.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("AI model not downloaded")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Open Settings to download Gemma 4 E2B.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.vertical, 3)
             }
         }
     }
 
+    private func downloadStatusRow(_ def: ModelDefinition) -> some View {
+        let progress = llmService.downloadingModels[def.id] ?? 0
+
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Downloading \(def.name)…")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Spacer()
+                Text("\(Int(progress * 100))%")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            ProgressView(value: progress)
+                .progressViewStyle(.linear)
+
+            Text("Keep CopyCopy open while the local AI model downloads.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 5)
+    }
+
     private var downloadedModels: [ModelDefinition] {
         ModelDefinition.all.filter(\.isDownloaded)
+    }
+
+    private var downloadingModels: [ModelDefinition] {
+        ModelDefinition.all.filter { llmService.downloadingModels[$0.id] != nil }
     }
 }

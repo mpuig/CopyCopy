@@ -40,7 +40,7 @@ struct SettingsAboutPane: View {
                         .frame(width: 92, height: 92)
                         .cornerRadius(16)
                         .scaleEffect(iconHover ? 1.05 : 1.0)
-                        .shadow(color: iconHover ? .accentColor.opacity(0.25) : .clear, radius: 6)
+                        .shadow(color: iconHover ? Color.ccAccent.opacity(0.25) : .clear, radius: 6)
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering in

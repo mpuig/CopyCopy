@@ -13,7 +13,7 @@ class FloatingActionPanel: NSPanel {
         contentViewModel.onActionStarted = onActionStarted
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: 380, height: 300),
             styleMask: [.borderless, .nonactivatingPanel, .resizable],
             backing: .buffered,
             defer: false
@@ -81,7 +81,7 @@ class FloatingActionPanel: NSPanel {
 
         guard let screen = screen else { return }
 
-        let panelSize = CGSize(width: 400, height: desiredPanelHeight())
+        let panelSize = CGSize(width: 380, height: desiredPanelHeight())
         var origin = NSPoint(
             x: mouseLocation.x - panelSize.width / 2,
             y: mouseLocation.y - panelSize.height - 20
@@ -191,6 +191,10 @@ class FloatingActionPanel: NSPanel {
     func showResult(_ text: String, isInClipboard: Bool = false) {
         contentViewModel.showResult(text, isInClipboard: isInClipboard)
     }
+
+    func updateActionsIfIdle(_ actions: [SuggestedAction]) {
+        contentViewModel.updateActionsIfIdle(actions)
+    }
 }
 
 @MainActor
@@ -260,10 +264,16 @@ class FloatingPanelViewModel: ObservableObject {
         }
     }
 
+    func updateActionsIfIdle(_ newActions: [SuggestedAction]) {
+        guard processingState == .idle, !newActions.isEmpty else { return }
+        actions = newActions
+        selectedIndex = min(selectedIndex, max(newActions.count - 1, 0))
+    }
+
     func selectPrevious() {
         if processingState == .completed, !followUpActions.isEmpty {
             selectedFollowUpIndex = (selectedFollowUpIndex - 1 + followUpActions.count) % followUpActions.count
-        } else if processingState == .idle {
+        } else if processingState == .idle, !actions.isEmpty {
             selectedIndex = (selectedIndex - 1 + actions.count) % actions.count
         }
     }
@@ -271,7 +281,7 @@ class FloatingPanelViewModel: ObservableObject {
     func selectNext() {
         if processingState == .completed, !followUpActions.isEmpty {
             selectedFollowUpIndex = (selectedFollowUpIndex + 1) % followUpActions.count
-        } else if processingState == .idle {
+        } else if processingState == .idle, !actions.isEmpty {
             selectedIndex = (selectedIndex + 1) % actions.count
         }
     }
@@ -377,7 +387,7 @@ class FloatingPanelViewModel: ObservableObject {
         UsageHistory.shared.record(
             skillId: action.skillId,
             contentKind: .plainText,
-            sourceContext: .other
+            sourceContext: context.sourceAppContext
         )
 
         Task { @MainActor [weak self] in
@@ -410,10 +420,14 @@ class FloatingPanelViewModel: ObservableObject {
         }
 
         // Build the available skills pool (excluding used + irrelevant)
-        let resultContext = ClipboardContext.fromResultText(text, classifier: classifier)
+        let resultContext = ClipboardContext.fromResultText(
+            text,
+            classifier: classifier,
+            copyEvent: context.copyEvent
+        )
         let matched = skillLoader.matchingActions(
             for: .plainText,
-            sourceContext: .other,
+            sourceContext: resultContext.sourceAppContext,
             entities: resultContext.snapshot.detectedEntities,
             context: resultContext,
             executor: executor
@@ -466,11 +480,15 @@ class FloatingPanelViewModel: ObservableObject {
                 await MainActor.run {
                     guard self.processingState == .completed else { return }
                     if !suggested.isEmpty {
-                        let reordered = suggested.compactMap { id in
+                        var reordered = suggested.compactMap { id in
                             candidates.first { $0.skillId == id }
                         }
+                        for candidate in self.followUpActions where !reordered.contains(where: { $0.skillId == candidate.skillId }) {
+                            reordered.append(candidate)
+                        }
                         if !reordered.isEmpty {
-                            self.followUpActions = reordered
+                            self.followUpActions = Array(reordered.prefix(3))
+                            self.selectedFollowUpIndex = min(self.selectedFollowUpIndex, max(self.followUpActions.count - 1, 0))
                         }
                     }
                 }
@@ -556,20 +574,31 @@ struct FloatingPanelView: View {
             if viewModel.executedAction != nil {
                 executedSection
             } else {
+                panelDivider
                 actionsSection
             }
         }
         .padding(6)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(NSColor.windowBackgroundColor))
+            RoundedRectangle(cornerRadius: CCRadius.panel, style: .continuous)
+                .fill(.regularMaterial)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: CCRadius.panel, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 6)
+        // Soft two-layer shadow — mirrors --shadow-panel; cards barely float on paper.
+        .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: 8)
+        .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 2)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.executedAction != nil)
+    }
+
+    private var panelDivider: some View {
+        Rectangle()
+            .fill(Color.ccBorder)
+            .frame(height: 1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
     }
 
     private var headerSection: some View {
@@ -579,14 +608,14 @@ struct FloatingPanelView: View {
                 .foregroundStyle(.tertiary)
                 .frame(width: 20, alignment: .center)
             Text(viewModel.contentTypeDescription)
-                .font(.callout)
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             Spacer()
             if viewModel.processingState == .idle, !viewModel.actions.isEmpty {
                 Text("↑↓")
-                    .font(.caption2)
-                    .foregroundStyle(.quaternary)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.tertiary)
             }
         }
         .padding(.horizontal, 10)
@@ -662,7 +691,7 @@ struct FloatingPanelView: View {
                     .foregroundStyle(.secondary)
                 Image(systemName: "checkmark.circle.fill")
                     .font(.body)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.ccSuccess)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -683,8 +712,8 @@ struct FloatingPanelView: View {
                         .padding(8)
                 }
                 .frame(maxHeight: 200)
-                .background(Color(NSColor.textBackgroundColor).opacity(0.3))
-                .cornerRadius(6)
+                .background(Color.ccSurfaceSunken.opacity(0.7))
+                .cornerRadius(CCRadius.sm)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
             }
@@ -710,10 +739,11 @@ struct FloatingPanelView: View {
             } else if case .processing = viewModel.processingState {
                 ProgressView()
                     .controlSize(.small)
+                    .tint(.ccAccent)
             } else if viewModel.processingState == .completed {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.body)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.ccSuccess)
             }
         }
         .padding(.horizontal, 10)
@@ -726,6 +756,7 @@ struct FloatingPanelView: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
+                        .tint(.ccAccent)
                     Text(message)
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -742,8 +773,8 @@ struct FloatingPanelView: View {
                         .padding(8)
                 }
                 .frame(maxHeight: 300)
-                .background(Color(NSColor.textBackgroundColor).opacity(0.3))
-                .cornerRadius(6)
+                .background(Color.ccSurfaceSunken.opacity(0.7))
+                .cornerRadius(CCRadius.sm)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
 
@@ -758,11 +789,11 @@ struct FloatingPanelView: View {
                             .font(.body)
                         Spacer()
                         Text("⌘V")
-                            .font(.caption)
-                            .padding(.horizontal, 5)
+                            .font(.system(size: 12, design: .monospaced))
+                            .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(.white.opacity(0.08))
-                            .cornerRadius(4)
+                            .background(Color.primary.opacity(0.07))
+                            .cornerRadius(CCRadius.xs)
                             .foregroundStyle(.tertiary)
                     }
                     .padding(.horizontal, 10)
@@ -775,6 +806,16 @@ struct FloatingPanelView: View {
     private var followUpSection: some View {
         VStack(spacing: 0) {
             if !viewModel.followUpActions.isEmpty {
+                Text("Follow-up actions")
+                    .font(.system(size: 11, weight: .semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 6)
+                    .padding(.bottom, 3)
+
                 VStack(spacing: 2) {
                     ForEach(Array(viewModel.followUpActions.enumerated()), id: \.element.id) { index, action in
                         ActionRow(action: action, isSelected: index == viewModel.selectedFollowUpIndex, index: index)
@@ -826,7 +867,7 @@ struct ActionRow: View {
                 if let subtitle = action.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.caption2)
-                        .foregroundStyle(isSelected ? Color.white.opacity(0.7) : Color.secondary.opacity(0.6))
+                        .foregroundStyle(isSelected ? Color.white.opacity(0.72) : Color.secondary.opacity(0.6))
                 }
             }
 
@@ -841,8 +882,8 @@ struct ActionRow: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isSelected ? Color.accentColor : (isHovered ? Color.white.opacity(0.08) : Color.clear))
+            RoundedRectangle(cornerRadius: CCRadius.sm, style: .continuous)
+                .fill(isSelected ? Color.ccAccent : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
         )
         .scaleEffect(isSelected ? 1.0 : (isHovered ? 1.01 : 1.0))
         .animation(.spring(response: 0.25, dampingFraction: 0.9), value: isSelected)

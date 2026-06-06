@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "name": "CopyCopy Understanding Evaluation Dataset",
+  "description": "Synthetic fixtures for evaluating whether CopyCopy can understand clipboard content before suggesting or executing actions.",
+  "mode": "understanding",
+  "allowedContentKinds": ["text", "url", "html", "markdown", "code", "json", "sql", "log", "path", "base64", "email", "chat", "article", "unknown"],
+  "allowedEntities": ["codeSnippet", "markdown", "emailDraft", "slackDraft", "shellCommand", "logOutput", "sql", "foreignLanguage", "url", "filePath", "json", "base64", "html", "article", "chatTranscript"],
+  "allowedSourceContexts": ["terminal", "ide", "browser", "email", "chat", "notes", "other"],
+  "cases": [
+    {
+      "id": "understand-terminal-error-001",
+      "title": "Swift package terminal error",
+      "sourceApp": "Terminal",
+      "sourceContext": "terminal",
+      "clipboard": "$ swift build\nerror: package 'MenuBarExtraAccess' requires macOS 14.0, but target 'CopyCopy' supports macOS 13.0",
+      "expected": {
+        "contentKind": "log",
+        "entities": ["logOutput"],
+        "sourceContext": "terminal",
+        "confidenceAtLeast": 0.7
+      },
+      "rejectIf": ["Classifies as article", "Misses logOutput", "Treats as natural-language email"]
+    },
+    {
+      "id": "understand-js-code-002",
+      "title": "JavaScript async snippet",
+      "sourceApp": "Visual Studio Code",
+      "sourceContext": "ide",
+      "clipboard": "async function loadUsers(ids) {\n  return ids.map(async id => fetchUser(id));\n}",
+      "expected": {
+        "contentKind": "code",
+        "entities": ["codeSnippet"],
+        "sourceContext": "ide",
+        "confidenceAtLeast": 0.75
+      },
+      "rejectIf": ["Classifies as markdown", "Misses codeSnippet"]
+    },
+    {
+      "id": "understand-sql-003",
+      "title": "SQL query",
+      "sourceApp": "TablePlus",
+      "sourceContext": "ide",
+      "clipboard": "SELECT workspace_id, COUNT(*) FROM exports WHERE status = 'failed' GROUP BY workspace_id;",
+      "expected": {
+        "contentKind": "sql",
+        "entities": ["sql", "codeSnippet"],
+        "sourceContext": "ide",
+        "confidenceAtLeast": 0.75
+      },
+      "rejectIf": ["Classifies as emailDraft", "Misses sql"]
+    },
+    {
+      "id": "understand-chat-004",
+      "title": "Noisy chat transcript",
+      "sourceApp": "Slack",
+      "sourceContext": "chat",
+      "clipboard": "Search\nThreads\nMarc 09:14\nCan we ship the model selector behind a feature flag?\nNina 09:15\nYes, downloads should stay visible in settings.\nMessage copycopy-team",
+      "expected": {
+        "contentKind": "chat",
+        "entities": ["chatTranscript"],
+        "sourceContext": "chat",
+        "confidenceAtLeast": 0.7
+      },
+      "rejectIf": ["Classifies as code", "Misses chatTranscript"]
+    },
+    {
+      "id": "understand-email-draft-005",
+      "title": "Email reply draft",
+      "sourceApp": "Mail",
+      "sourceContext": "email",
+      "clipboard": "Hi Lea,\n\nI attached the crash logs. The issue happens after Accessibility permission is granted.\n\nThanks,\nMarc",
+      "expected": {
+        "contentKind": "email",
+        "entities": ["emailDraft"],
+        "sourceContext": "email",
+        "confidenceAtLeast": 0.7
+      },
+      "rejectIf": ["Classifies as log", "Misses emailDraft"]
+    },
+    {
+      "id": "understand-article-006",
+      "title": "Article markdown",
+      "sourceApp": "Safari",
+      "sourceContext": "browser",
+      "clipboard": "# Atlas Notes launches offline sync\n\nAtlas Notes announced offline sync for its macOS app. The feature stores encrypted note changes locally and uploads them when the network returns.",
+      "expected": {
+        "contentKind": "article",
+        "entities": ["markdown", "article"],
+        "sourceContext": "browser",
+        "confidenceAtLeast": 0.65
+      },
+      "rejectIf": ["Classifies as chat", "Misses markdown"]
+    },
+    {
+      "id": "understand-html-007",
+      "title": "Article HTML",
+      "sourceApp": "Safari",
+      "sourceContext": "browser",
+      "clipboard": "<article><h1>Release checklist</h1><p>Confirm signing, notarization, and update metadata.</p></article>",
+      "expected": {
+        "contentKind": "html",
+        "entities": ["html", "article"],
+        "sourceContext": "browser",
+        "confidenceAtLeast": 0.75
+      },
+      "rejectIf": ["Classifies as plain text", "Misses html"]
+    },
+    {
+      "id": "understand-json-008",
+      "title": "JSON payload",
+      "sourceApp": "Chrome",
+      "sourceContext": "browser",
+      "clipboard": "{\"model\":\"MiniCPM5-1B\",\"metrics\":{\"ttft_ms\":420},\"passed\":true}",
+      "expected": {
+        "contentKind": "json",
+        "entities": ["json"],
+        "sourceContext": "browser",
+        "confidenceAtLeast": 0.8
+      },
+      "rejectIf": ["Classifies as code only", "Misses json"]
+    },
+    {
+      "id": "understand-url-009",
+      "title": "Search URL",
+      "sourceApp": "Safari",
+      "sourceContext": "browser",
+      "clipboard": "https://example.test/search?q=local%20llm%20clipboard&source=copycopy&debug=true",
+      "expected": {
+        "contentKind": "url",
+        "entities": ["url"],
+        "sourceContext": "browser",
+        "confidenceAtLeast": 0.85
+      },
+      "rejectIf": ["Classifies as article", "Attempts to fetch URL"]
+    },
+    {
+      "id": "understand-path-010",
+      "title": "macOS file path",
+      "sourceApp": "Finder",
+      "sourceContext": "other",
+      "clipboard": "/Users/marc/Downloads/CopyCopy-0.4.0.dmg",
+      "expected": {
+        "contentKind": "path",
+        "entities": ["filePath"],
+        "sourceContext": "other",
+        "confidenceAtLeast": 0.8
+      },
+      "rejectIf": ["Classifies as url", "Misses filePath"]
+    },
+    {
+      "id": "understand-base64-011",
+      "title": "Base64 text",
+      "sourceApp": "Terminal",
+      "sourceContext": "terminal",
+      "clipboard": "TW9kZWwgbG9hZGVkOiBNaW5pQ1BNNS0xQiBROF8w",
+      "expected": {
+        "contentKind": "base64",
+        "entities": ["base64"],
+        "sourceContext": "terminal",
+        "confidenceAtLeast": 0.65
+      },
+      "rejectIf": ["Decodes instead of classifies", "Classifies as natural text"]
+    },
+    {
+      "id": "understand-foreign-language-012",
+      "title": "Spanish product note",
+      "sourceApp": "Notes",
+      "sourceContext": "notes",
+      "clipboard": "Recordatorio: revisar el flujo de permisos antes de publicar la beta. El panel debe explicar por qué se necesita Accesibilidad.",
+      "expected": {
+        "contentKind": "text",
+        "entities": ["foreignLanguage"],
+        "sourceContext": "notes",
+        "confidenceAtLeast": 0.7
+      },
+      "rejectIf": ["Translates instead of classifies", "Misses foreignLanguage"]
+    }
+  ]
+}

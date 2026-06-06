@@ -3,19 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CopyCopy - Skills Documentation</title>
+  <title>CopyCopy - Default Skills</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/themes/vue.css">
   <style>
     :root {
       --theme-color: #3884ff;
     }
     .markdown-section {
-      max-width: 800px;
+      max-width: 900px;
     }
     .sidebar {
       display: none;
     }
-    /* Override docsify app-nav completely */
     body > nav.app-nav {
       position: fixed !important;
       top: 0 !important;
@@ -46,12 +45,18 @@
       font-weight: bold;
       margin-right: 40px;
     }
-    /* Push content below fixed nav */
     body > main#app {
       padding-top: 60px !important;
     }
     section.content {
       padding-top: 20px !important;
+    }
+    .markdown-section table {
+      display: table;
+      width: 100%;
+    }
+    .markdown-section code {
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -69,13 +74,13 @@
       name: 'CopyCopy',
       loadSidebar: false,
       loadNavbar: false,
-      homepage: './ACTIONS.md',
+      homepage: './DEFAULT_SKILLS.md',
       relativePath: true,
       notFoundPage: true,
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/docsify@4"></script>
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js"></script>
 </body>
 </html>

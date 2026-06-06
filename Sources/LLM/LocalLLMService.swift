@@ -25,7 +25,12 @@ final class LocalLLMService: ObservableObject {
     }
 
     var currentModelId: String {
-        UserDefaults.standard.string(forKey: "llmModel") ?? ModelDefinition.defaultId
+        guard let stored = UserDefaults.standard.string(forKey: "llmModel"),
+              ModelDefinition.find(stored) != nil else {
+            UserDefaults.standard.set(ModelDefinition.defaultId, forKey: "llmModel")
+            return ModelDefinition.defaultId
+        }
+        return stored
     }
 
     var currentModelDefinition: ModelDefinition? {
@@ -215,8 +220,9 @@ final class LocalLLMService: ObservableObject {
         let response = try await generate(
             prompt: truncatedText,
             systemPrompt: """
-            Classify using only these labels: ["codeSnippet","markdown","emailDraft","slackDraft","shellCommand","logOutput","sql","foreignLanguage"].
-            Return a JSON array. Prefer [] when unsure. JSON only.
+            Classify clipboard text for CopyCopy routing.
+            Return only a JSON array using these labels: ["codeSnippet","markdown","emailDraft","slackDraft","shellCommand","logOutput","sql","foreignLanguage"].
+            Include only labels that are clearly present. Prefer [] when unsure. No prose. No Markdown.
             """,
             temperature: 0.0,
             maxTokens: 80

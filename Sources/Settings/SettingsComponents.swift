@@ -84,11 +84,11 @@ struct AboutLinkRow: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                 Text(title)
-                    .underline(hovering, color: .accentColor)
+                    .underline(hovering, color: .ccAccent)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
-            .foregroundColor(.accentColor)
+            .foregroundColor(.ccAccent)
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())

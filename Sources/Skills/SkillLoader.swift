@@ -121,7 +121,11 @@ final class SkillLoader {
         lhs.contentTypes == rhs.contentTypes &&
         lhs.entityTypes == rhs.entityTypes &&
         lhs.sourceContexts == rhs.sourceContexts &&
-        lhs.tools == rhs.tools
+        lhs.sourceBoosts == rhs.sourceBoosts &&
+        lhs.minimumCharacterCount == rhs.minimumCharacterCount &&
+        lhs.maximumCharacterCount == rhs.maximumCharacterCount &&
+        lhs.tools == rhs.tools &&
+        lhs.temperature == rhs.temperature
     }
 
     func matchingActions(

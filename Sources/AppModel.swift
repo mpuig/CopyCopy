@@ -227,6 +227,7 @@ final class AppModel: ObservableObject {
         )
 
         suggestedActions = actions
+        floatingPanel?.updateActionsIfIdle(actions)
         scheduleSemanticClassificationIfNeeded(for: ctx)
     }
 

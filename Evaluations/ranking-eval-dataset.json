@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "name": "CopyCopy Ranking and Pipeline Evaluation Dataset",
+  "description": "Synthetic fixtures for evaluating next-best-action ranking, learning from past actions, and pipeline follow-up suggestions.",
+  "mode": "ranking",
+  "availableActions": [
+    "Clean Text",
+    "Summarize",
+    "Translate to English",
+    "Translate to Chinese",
+    "Explain Code",
+    "Find Bug",
+    "Refactor Code",
+    "Explain Terminal Error",
+    "Strip ANSI",
+    "Format JSON",
+    "Decode Base64",
+    "Decode URL",
+    "Smart Markdown",
+    "Clean Chat Transcript",
+    "Draft Reply",
+    "Extract Action Items",
+    "Reveal in Finder",
+    "Open in Terminal",
+    "Open URL",
+    "Copy to Clipboard"
+  ],
+  "cases": [
+    {
+      "id": "rank-terminal-error-001",
+      "title": "Terminal build error should prioritize explanation",
+      "phase": "ranking",
+      "sourceContext": "terminal",
+      "clipboard": "$ swift build\nerror: package 'MenuBarExtraAccess' requires macOS 14.0, but target 'CopyCopy' supports macOS 13.0",
+      "understanding": {"contentKind": "log", "entities": ["logOutput"]},
+      "usageHistory": [],
+      "expectedTopActions": ["Explain Terminal Error", "Clean Text", "Copy to Clipboard"],
+      "mustIncludeTop3": ["Explain Terminal Error"],
+      "rejectedTopActions": ["Translate to Chinese", "Smart Markdown", "Open URL"],
+      "rationale": "A terminal error copied from Terminal usually needs explanation or cleanup, not translation or browser actions."
+    },
+    {
+      "id": "rank-json-002",
+      "title": "Compact JSON should prioritize formatting",
+      "phase": "ranking",
+      "sourceContext": "browser",
+      "clipboard": "{\"model\":\"MiniCPM5-1B\",\"metrics\":{\"ttft_ms\":420},\"passed\":true}",
+      "understanding": {"contentKind": "json", "entities": ["json"]},
+      "usageHistory": [],
+      "expectedTopActions": ["Format JSON", "Copy to Clipboard", "Summarize"],
+      "mustIncludeTop3": ["Format JSON"],
+      "rejectedTopActions": ["Translate to English", "Smart Markdown", "Explain Terminal Error"],
+      "rationale": "Structured JSON has an obvious deterministic action before AI transforms."
+    },
+    {
+      "id": "rank-chat-003",
+      "title": "Noisy chat should clean before summarize",
+      "phase": "ranking",
+      "sourceContext": "chat",
+      "clipboard": "Search\nThreads\nMarc 09:14\nCan we ship the model selector behind a feature flag?\nNina 09:15\nYes, downloads should stay visible in settings.\nMessage copycopy-team",
+      "understanding": {"contentKind": "chat", "entities": ["chatTranscript"]},
+      "usageHistory": [],
+      "expectedTopActions": ["Clean Chat Transcript", "Summarize", "Extract Action Items"],
+      "mustIncludeTop3": ["Clean Chat Transcript", "Summarize"],
+      "rejectedTopActions": ["Format JSON", "Decode URL", "Reveal in Finder"],
+      "rationale": "Copied chat with app chrome should be cleaned first, then summarized or mined for action items."
+    },
+    {
+      "id": "rank-code-004",
+      "title": "Code from IDE should prioritize code actions",
+      "phase": "ranking",
+      "sourceContext": "ide",
+      "clipboard": "async function loadUsers(ids) {\n  const users = [];\n  ids.forEach(async (id) => users.push(await fetchUser(id)));\n  return users;\n}",
+      "understanding": {"contentKind": "code", "entities": ["codeSnippet"]},
+      "usageHistory": [],
+      "expectedTopActions": ["Find Bug", "Explain Code", "Refactor Code"],
+      "mustIncludeTop3": ["Find Bug", "Explain Code"],
+      "rejectedTopActions": ["Translate to Chinese", "Smart Markdown", "Decode Base64"],
+      "rationale": "The snippet contains a likely async bug and came from an IDE."
+    },
+    {
+      "id": "rank-url-005",
+      "title": "URL should prioritize URL utilities",
+      "phase": "ranking",
+      "sourceContext": "browser",
+      "clipboard": "https://example.test/search?q=local%20llm%20clipboard&source=copycopy&debug=true",
+      "understanding": {"contentKind": "url", "entities": ["url"]},
+      "usageHistory": [],
+      "expectedTopActions": ["Decode URL", "Open URL", "Copy to Clipboard"],
+      "mustIncludeTop3": ["Decode URL", "Open URL"],
+      "rejectedTopActions": ["Format JSON", "Explain Code", "Clean Chat Transcript"],
+      "rationale": "A URL should get URL-specific actions above generic AI transforms."
+    },
+    {
+      "id": "rank-path-006",
+      "title": "File path should prioritize Finder/Terminal actions",
+      "phase": "ranking",
+      "sourceContext": "other",
+      "clipboard": "/Users/marc/Downloads/CopyCopy-0.4.0.dmg",
+      "understanding": {"contentKind": "path", "entities": ["filePath"]},
+      "usageHistory": [],
+      "expectedTopActions": ["Reveal in Finder", "Open in Terminal", "Copy to Clipboard"],
+      "mustIncludeTop3": ["Reveal in Finder"],
+      "rejectedTopActions": ["Summarize", "Translate to English", "Smart Markdown"],
+      "rationale": "Local file paths should route to OS/file actions before language actions."
+    },
+    {
+      "id": "learn-browser-article-007",
+      "title": "Learning should boost user's article workflow",
+      "phase": "learning",
+      "sourceContext": "browser",
+      "clipboard": "# Atlas Notes launches offline sync\n\nAtlas Notes announced offline sync for its macOS app and will publish an encryption whitepaper next month.",
+      "understanding": {"contentKind": "article", "entities": ["markdown", "article"]},
+      "usageHistory": [
+        {"sourceContext": "browser", "contentKind": "article", "action": "Smart Markdown", "count": 5},
+        {"sourceContext": "browser", "contentKind": "markdown", "action": "Summarize", "count": 4}
+      ],
+      "expectedTopActions": ["Smart Markdown", "Summarize", "Extract Action Items"],
+      "mustIncludeTop3": ["Smart Markdown", "Summarize"],
+      "rejectedTopActions": ["Explain Code", "Reveal in Finder", "Decode Base64"],
+      "rationale": "Past browser/article behavior should boost the user's preferred markdown then summarize workflow."
+    },
+    {
+      "id": "learn-terminal-log-008",
+      "title": "Learning should boost preferred terminal action",
+      "phase": "learning",
+      "sourceContext": "terminal",
+      "clipboard": "ERROR download failed status=403 url=https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf/resolve/main/model.gguf",
+      "understanding": {"contentKind": "log", "entities": ["logOutput", "url"]},
+      "usageHistory": [
+        {"sourceContext": "terminal", "contentKind": "log", "action": "Explain Terminal Error", "count": 7},
+        {"sourceContext": "terminal", "contentKind": "log", "action": "Clean Text", "count": 2}
+      ],
+      "expectedTopActions": ["Explain Terminal Error", "Decode URL", "Clean Text"],
+      "mustIncludeTop3": ["Explain Terminal Error"],
+      "rejectedTopActions": ["Translate to Chinese", "Smart Markdown", "Draft Reply"],
+      "rationale": "Repeated terminal-log choices should reinforce explanation as the first action."
+    },
+    {
+      "id": "pipeline-html-009",
+      "title": "After HTML-to-Markdown, suggest summary workflow",
+      "phase": "pipeline",
+      "sourceContext": "browser",
+      "clipboard": "<article><h1>Release checklist</h1><p>Confirm signing, notarization, and update metadata.</p><ul><li>Run smoke tests</li><li>Verify Sparkle feed</li></ul></article>",
+      "previousSteps": [
+        {"action": "Smart Markdown", "resultKind": "markdown", "resultPreview": "# Release checklist\n\nConfirm signing, notarization, and update metadata.\n\n- Run smoke tests\n- Verify Sparkle feed"}
+      ],
+      "understanding": {"contentKind": "markdown", "entities": ["markdown", "article"]},
+      "usageHistory": [],
+      "expectedTopActions": ["Summarize", "Extract Action Items", "Copy to Clipboard"],
+      "mustIncludeTop3": ["Summarize", "Extract Action Items"],
+      "rejectedTopActions": ["Smart Markdown", "Decode Base64", "Open URL"],
+      "rationale": "After conversion, repeating HTML-to-Markdown is redundant; useful follow-ups summarize or extract tasks."
+    },
+    {
+      "id": "pipeline-clean-chat-010",
+      "title": "After cleaning chat, suggest summarize/action items",
+      "phase": "pipeline",
+      "sourceContext": "chat",
+      "clipboard": "Marc 09:14\nCan we ship the model selector behind a feature flag?\nNina 09:15\nYes, downloads should stay visible in settings.",
+      "previousSteps": [
+        {"action": "Clean Chat Transcript", "resultKind": "chat", "resultPreview": "Marc 09:14 Can we ship the model selector behind a feature flag?\nNina 09:15 Yes, downloads should stay visible in settings."}
+      ],
+      "understanding": {"contentKind": "chat", "entities": ["chatTranscript"]},
+      "usageHistory": [],
+      "expectedTopActions": ["Summarize", "Extract Action Items", "Draft Reply"],
+      "mustIncludeTop3": ["Summarize", "Extract Action Items"],
+      "rejectedTopActions": ["Clean Chat Transcript", "Format JSON", "Decode URL"],
+      "rationale": "Once chat is clean, the next useful actions are summary or action extraction, not cleaning again."
+    }
+  ]
+}

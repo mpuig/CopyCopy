@@ -5,7 +5,6 @@ import SwiftUI
 struct SettingsGeneralPane: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var localLLM = LocalLLMService.shared
-    @State private var downloadedModels: Set<String> = []
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
@@ -42,7 +41,7 @@ struct SettingsGeneralPane: View {
 
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Color.ccSuccess)
                         Text("\(BuiltInSkills.all.count) built-in skills active")
                     }
 
@@ -93,14 +92,13 @@ struct SettingsGeneralPane: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
         }
-        .onAppear { refreshDownloadStatus() }
     }
 
     private func modelRow(_ model: ModelDefinition) -> some View {
         VStack(spacing: 4) {
             HStack(spacing: 10) {
                 Image(systemName: settings.llmModel == model.id ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(settings.llmModel == model.id ? Color.accentColor : .secondary)
+                    .foregroundStyle(settings.llmModel == model.id ? Color.ccAccent : .secondary)
                     .onTapGesture {
                         settings.llmModel = model.id
                         if model.isDownloaded && localLLM.loadedModelId != model.id {
@@ -121,7 +119,7 @@ struct SettingsGeneralPane: View {
                 if localLLM.loadedModelId == model.id {
                     Label("Active", systemImage: "checkmark.circle.fill")
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.ccSuccess)
                 } else if localLLM.downloadingModels[model.id] != nil {
                     ProgressView()
                         .controlSize(.small)
@@ -135,7 +133,6 @@ struct SettingsGeneralPane: View {
                     Button("Download") {
                         Task {
                             await LocalLLMService.shared.downloadModel(model)
-                            refreshDownloadStatus()
                         }
                     }
                     .controlSize(.small)
@@ -154,9 +151,5 @@ struct SettingsGeneralPane: View {
             }
         }
         .padding(.vertical, 4)
-    }
-
-    private func refreshDownloadStatus() {
-        downloadedModels = Set(ModelDefinition.all.filter(\.isDownloaded).map(\.id))
     }
 }
