@@ -48,7 +48,11 @@ To produce notarized release assets on `release.published`, set these repository
 - `APP_IDENTITY`: `Developer ID Application: … (TEAMID)`
 - `MACOS_CERT_P12_BASE64`: base64 of your exported Developer ID `.p12`
 - `MACOS_CERT_PASSWORD`: password for the `.p12`
+- `HOMEBREW_TAP_TOKEN`: GitHub token with write access to `mpuig/homebrew-copycopy`
 - Notarization (pick one approach):
   - `NOTARYTOOL_KEYCHAIN_PROFILE` (if you set up a profile in CI), or
   - `APP_STORE_CONNECT_API_KEY_P8`, `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`
 
+### Homebrew cask
+
+On `release.published`, `.github/workflows/release.yml` uploads the macOS zip asset and then updates `mpuig/homebrew-copycopy` by bumping `Casks/copycopy.rb` to the release version and SHA-256 checksum. The release tag should use the `vX.Y.Z` format because the cask stores `X.Y.Z` and downloads `CopyCopy-vX.Y.Z-macos.zip`.
