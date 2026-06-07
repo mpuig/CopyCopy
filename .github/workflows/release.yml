@@ -164,6 +164,57 @@ jobs:
           git commit -m "copycopy ${VERSION}"
           git push origin main
 
+      - name: Publish Sparkle appcast
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SPARKLE_PRIVATE_KEY}" ]]; then
+            echo "Missing secret: SPARKLE_PRIVATE_KEY" >&2
+            exit 1
+          fi
+
+          source ./version.env
+          TAG="${{ github.event.release.tag_name }}"
+          ASSET="${{ steps.package.outputs.asset }}"
+          URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET}"
+          NOTES_URL="${{ github.event.release.html_url }}"
+          PUBDATE="$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"
+
+          # EdDSA-sign the zip → "sparkle:edSignature=\"...\" length=\"...\""
+          SIGN_UPDATE="$(find .build -path '*Sparkle/bin/sign_update' | head -1)"
+          [[ -x "$SIGN_UPDATE" ]] || { echo "sign_update tool not found under .build" >&2; exit 1; }
+          KEYF="$RUNNER_TEMP/sparkle_ed_key"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEYF"
+          SIG_ATTRS="$("$SIGN_UPDATE" --ed-key-file "$KEYF" "$ASSET")"
+          rm -f "$KEYF"
+
+          ITEM_FILE="$RUNNER_TEMP/appcast-item.xml"
+          printf '    <item>\n      <title>%s</title>\n      <link>%s</link>\n      <sparkle:version>%s</sparkle:version>\n      <sparkle:shortVersionString>%s</sparkle:shortVersionString>\n      <sparkle:minimumSystemVersion>%s</sparkle:minimumSystemVersion>\n      <pubDate>%s</pubDate>\n      <enclosure url="%s" %s type="application/octet-stream" />\n    </item>\n' \
+            "$VERSION" "$NOTES_URL" "$BUILD" "$VERSION" "$MIN_SYSTEM_VERSION" "$PUBDATE" "$URL" "$SIG_ATTRS" > "$ITEM_FILE"
+
+          # Update docs/appcast.xml on the default branch (served at copycopy.app via Pages).
+          REPO_DIR="$RUNNER_TEMP/copycopy-pages"
+          git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" "$REPO_DIR"
+          cd "$REPO_DIR"
+
+          if grep -q "<sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>" docs/appcast.xml; then
+            echo "Appcast already lists ${VERSION}."
+            exit 0
+          fi
+
+          awk -v f="$ITEM_FILE" '/<!-- RELEASE_ITEMS -->/{print; while((getline line < f)>0) print line; close(f); next} {print}' \
+            docs/appcast.xml > docs/appcast.xml.new
+          mv docs/appcast.xml.new docs/appcast.xml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/appcast.xml
+          git commit -m "appcast: CopyCopy ${VERSION}"
+          git push origin HEAD:main
+
       - name: Upload workflow artifact (manual runs)
         if: github.event_name != 'release'
         uses: actions/upload-artifact@v4

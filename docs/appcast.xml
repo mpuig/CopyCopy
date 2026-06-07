@@ -5,5 +5,10 @@
     <link>https://copycopy.app/appcast.xml</link>
     <description>CopyCopy release updates.</description>
     <language>en</language>
+    <!-- Items are EdDSA-signed and inserted by .github/workflows/release.yml on each
+         release (newest first). Builds at or before v0.4.0 shipped without
+         SUPublicEDKey and cannot validate these signatures; in-app updates work
+         from v0.4.1 onward (upgrade once via Homebrew or download to bootstrap). -->
+    <!-- RELEASE_ITEMS -->
   </channel>
 </rss>

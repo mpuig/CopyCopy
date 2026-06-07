@@ -28,6 +28,8 @@
 	<true/>
 	<key>SUFeedURL</key>
 	<string>https://copycopy.app/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>kv+bKebrBiVvqksoUmDzJmBrD6LoUJ01Zu+Xh95zooM=</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 </dict>

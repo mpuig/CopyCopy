@@ -93,6 +93,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>SUFeedURL</key><string>${APPCAST_URL:-https://copycopy.app/appcast.xml}</string>
+  <key>SUPublicEDKey</key><string>${SPARKLE_PUBLIC_ED_KEY}</string>
   <key>CopyCopyBuildTimestamp</key><string>${BUILD_TIMESTAMP}</string>
   <key>CopyCopyGitCommit</key><string>${GIT_COMMIT}</string>
   <key>CopyCopyHomepageURL</key><string>${HOMEPAGE_URL}</string>

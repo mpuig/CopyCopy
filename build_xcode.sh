@@ -72,6 +72,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
   <key>SUFeedURL</key><string>https://copycopy.app/appcast.xml</string>
+  <key>SUPublicEDKey</key><string>kv+bKebrBiVvqksoUmDzJmBrD6LoUJ01Zu+Xh95zooM=</string>
 </dict>
 </plist>
 PLIST
