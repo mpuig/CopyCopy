@@ -22,7 +22,7 @@ Sources/
 ├── ContentExtractor.swift       # Main content extraction from HTML (scoring, boilerplate removal)
 ├── HTMLMarkdownConverter.swift  # HTML-to-Markdown pipeline
 ├── Clipboard/
-│   ├── ClipboardClassifier.swift          # Content kind and entity detection
+│   ├── ClipboardClassifier.swift          # Content kind and entity detection (off-main-thread, input capped at 50k chars)
 │   ├── ClipboardModels.swift              # Snapshot, context, and entity types
 │   ├── ClipboardTextPreprocessor.swift    # Chrome/noise stripping for LLM input
 │   ├── CopyEventTap.swift                 # Double-copy detection via CGEventTap
@@ -34,7 +34,9 @@ Sources/
 │   └── ModelDefinition.swift    # Model catalog with download URLs and chat templates
 ├── Settings/
 │   ├── SettingsView.swift
-│   ├── SettingsGeneralPane.swift  # Model selection, skills, system settings
+│   ├── SettingsWindowController.swift
+│   ├── SettingsGeneralPane.swift  # Model selection, skills, permissions, system settings
+│   ├── SettingsComponents.swift   # Shared rows/toggles (incl. PermissionStatusRow)
 │   ├── SettingsDebugPane.swift
 │   ├── SettingsAboutPane.swift
 │   └── AppSettings.swift
@@ -58,6 +60,8 @@ Sources/
 └── UI/
     ├── MenuContentView.swift    # Menu bar content with model switcher
     ├── FloatingActionPanel.swift # Glass-style action picker with streaming results
+    ├── OnboardingView.swift            # First-run permissions explainer
+    ├── OnboardingWindowController.swift # Presents OnboardingView once per install
     └── AboutPresenter.swift
 ```
 
@@ -97,6 +101,10 @@ Rules:
 
 **Detection**: Parser checks if body matches `toolName(args)` → function skill. Otherwise → LLM prompt.
 
+### Onboarding & permissions
+
+CopyCopy requires Accessibility and Input Monitoring to detect the double-⌘C gesture system-wide. `OnboardingView`/`OnboardingWindowController` show a first-run explainer (once per install, tracked by `AppSettings.hasCompletedOnboarding`) with deep links into System Settings via `PermissionsManager`. It auto-dismisses once both permissions are granted. The same live status (with a "Re-check" button) is also shown persistently in Settings → General via `PermissionStatusRow` (`SettingsComponents.swift`) — the menu-bar dimmed icon/prompt from `MenuContentView` is unchanged and additive to this.
+
 ### Source app context
 
 `SourceAppContext` determines where the user copied from. Influences which actions rank highest via `source-boosts`.
@@ -130,6 +138,10 @@ Previous pipeline steps show with +/- toggle to expand/collapse results. "Back" 
 ### Usage history
 
 `UsageHistory` tracks which skills users pick per (skillId, contentKind, sourceContext) tuple. Stored in `~/.copycopy/usage-history.json`. Frequently used skills get boosted in ranking (up to +50 after 5 uses).
+
+### Suggestion ranking and limits
+
+`SkillLoader.matchingActions` ranks by source-boost + entity-boost + length + usage-history score, then truncates to `SkillLoader.maxPrimarySuggestions` (8) for the primary action list — follow-up matching (in `FloatingActionPanel`) queries the same ranking without a limit so its own exclude-filter + `prefix(3)` has the full candidate pool. A custom skill under `~/.copycopy/skills/<id>/SKILL.md` that reuses a built-in's `id` silently overrides it in `SkillLoader`; this is surfaced to the user in Settings → General → Skills (`overriddenBuiltInIds` / `AppModel.overriddenBuiltInSkillIds`), which lists which built-in ids were replaced.
 
 ### LLM backend
 
