@@ -13,7 +13,7 @@ class FloatingActionPanel: NSPanel {
         contentViewModel.onActionStarted = onActionStarted
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: 392, height: 300),
             styleMask: [.borderless, .nonactivatingPanel, .resizable],
             backing: .buffered,
             defer: false
@@ -81,7 +81,7 @@ class FloatingActionPanel: NSPanel {
 
         guard let screen = screen else { return }
 
-        let panelSize = CGSize(width: 380, height: desiredPanelHeight())
+        let panelSize = CGSize(width: 392, height: desiredPanelHeight())
         var origin = NSPoint(
             x: mouseLocation.x - panelSize.width / 2,
             y: mouseLocation.y - panelSize.height - 20
@@ -261,6 +261,33 @@ class FloatingPanelViewModel: ObservableObject {
             return count > 1 ? "\(base) (\(count))" : base
         default:
             return base
+        }
+    }
+
+    /// Short content-type label shown in the panel header (e.g. "Rich Text").
+    var contentTypeLabel: String {
+        context.snapshot.primaryContentLabel
+    }
+
+    /// First detected entity, shown as an accent-subtle chip in the header
+    /// (e.g. "Email Draft"). `nil` when nothing was detected.
+    var entityChipLabel: String? {
+        let name = context.snapshot.detectedEntities.first?.displayName ?? ""
+        return name.isEmpty ? nil : name
+    }
+
+    /// Mono "N chars" / file count metadata for the header, or `nil` when the
+    /// content kind has no meaningful count (e.g. an image or URL).
+    var contentMeasureLabel: String? {
+        switch context.snapshot.kind {
+        case .plainText, .richText:
+            let count = context.snapshot.plainText?.count ?? 0
+            return "\(count) chars"
+        case .fileURLs:
+            let count = context.snapshot.fileURLs?.count ?? 0
+            return count > 1 ? "\(count) files" : nil
+        default:
+            return nil
         }
     }
 
@@ -583,13 +610,26 @@ struct FloatingPanelView: View {
             RoundedRectangle(cornerRadius: CCRadius.panel, style: .continuous)
                 .fill(.regularMaterial)
         )
+        // Warm glass tint over the material, matching the Foundry panel surface.
+        .background(
+            RoundedRectangle(cornerRadius: CCRadius.panel, style: .continuous)
+                .fill(Color.ccSurface0.opacity(0.25))
+        )
         .overlay(
             RoundedRectangle(cornerRadius: CCRadius.panel, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+                .strokeBorder(Color.ccTextPrimary.opacity(0.10), lineWidth: 1)
         )
-        // Soft two-layer shadow — mirrors --shadow-panel; cards barely float on paper.
-        .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: 8)
-        .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 2)
+        // Inset top highlight — the "inset 0 1px 0 rgba(255,255,255,0.6)" edge.
+        .overlay(alignment: .top) {
+            RoundedRectangle(cornerRadius: CCRadius.panel, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.35), lineWidth: 0.5)
+                .mask(
+                    LinearGradient(colors: [.white, .clear], startPoint: .top, endPoint: .center)
+                )
+        }
+        // Soft two-layer shadow — mirrors --shadow-panel; the card floats on paper.
+        .shadow(color: .black.opacity(0.30), radius: 24, x: 0, y: 14)
+        .shadow(color: .black.opacity(0.16), radius: 8, x: 0, y: 4)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.executedAction != nil)
     }
 
@@ -598,29 +638,92 @@ struct FloatingPanelView: View {
             .fill(Color.ccBorder)
             .frame(height: 1)
             .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.top, 2)
+            .padding(.bottom, 4)
     }
+
+    // MARK: Header
 
     private var headerSection: some View {
         HStack(spacing: 8) {
+            // Content-type icon tile
             Image(systemName: viewModel.contentTypeIcon)
-                .font(.body)
-                .foregroundStyle(.tertiary)
-                .frame(width: 20, alignment: .center)
-            Text(viewModel.contentTypeDescription)
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.ccTextSecondary)
+                .frame(width: 26, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: CCRadius.iconTile, style: .continuous)
+                        .fill(Color.ccSurface2)
+                )
+
+            Text(viewModel.contentTypeLabel)
+                .font(.ccSans(13.5))
+                .foregroundStyle(Color.ccTextSecondary)
                 .lineLimit(1)
-            Spacer()
-            if viewModel.processingState == .idle, !viewModel.actions.isEmpty {
-                Text("↑↓")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                .layoutPriority(1)
+
+            if let entity = viewModel.entityChipLabel {
+                Text(entity)
+                    .font(.ccMono(10, weight: .semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+                    .foregroundStyle(Color.ccAccentText)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: CCRadius.badge, style: .continuous)
+                            .fill(Color.ccAccentSoft)
+                    )
+                    .lineLimit(1)
+                    .fixedSize()
             }
+
+            Spacer(minLength: 4)
+
+            trailingHeaderContent
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.top, 9)
+        .padding(.bottom, 8)
     }
+
+    @ViewBuilder
+    private var trailingHeaderContent: some View {
+        if viewModel.executedAction != nil {
+            // Result / processing states show a machine-voice status pill.
+            switch viewModel.processingState {
+            case .completed:
+                statusPill(text: "Done", color: .ccStatusRunning, pulse: false)
+            case .processing:
+                statusPill(text: "Working", color: .ccAccent, pulse: true)
+            case .idle:
+                EmptyView()
+            }
+        } else if viewModel.processingState == .idle, !viewModel.actions.isEmpty {
+            if let measure = viewModel.contentMeasureLabel {
+                Text(measure)
+                    .font(.ccMono(11.5))
+                    .foregroundStyle(Color.ccTextMuted)
+                    .fixedSize()
+            }
+            KeyHint(text: "↑↓")
+        }
+    }
+
+    private func statusPill(text: String, color: Color, pulse: Bool) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+                .modifier(PulseModifier(active: pulse))
+            Text(text)
+                .font(.ccMono(11.5))
+                .foregroundStyle(color)
+        }
+        .fixedSize()
+    }
+
+    // MARK: Actions list (idle)
 
     private var actionsSection: some View {
         ScrollViewReader { proxy in
@@ -630,7 +733,7 @@ struct FloatingPanelView: View {
                         ActionRow(
                             action: action,
                             isSelected: index == viewModel.selectedIndex,
-                            index: index
+                            compact: false
                         )
                         .id(index)
                         .onTapGesture {
@@ -639,7 +742,7 @@ struct FloatingPanelView: View {
                         }
                     }
                 }
-                .padding(.vertical, 2)
+                .padding(2)
             }
             .onChange(of: viewModel.selectedIndex) { _, newIndex in
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
@@ -649,6 +752,8 @@ struct FloatingPanelView: View {
         }
         .frame(maxHeight: 240)
     }
+
+    // MARK: Executed / result
 
     private var executedSection: some View {
         VStack(spacing: 0) {
@@ -677,21 +782,21 @@ struct FloatingPanelView: View {
 
     private func pipelineStepRow(step: PipelineStep, index: Int) -> some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
+            HStack(spacing: 11) {
                 Image(systemName: step.action.systemImage)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20, alignment: .center)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(Color.ccTextSecondary)
+                    .frame(width: 22, alignment: .center)
                 Text(step.action.title)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .font(.ccSans(14, weight: .medium))
+                    .foregroundStyle(Color.ccTextSecondary)
                 Spacer()
                 Image(systemName: step.isExpanded ? "minus.circle" : "plus.circle")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.ccTextMuted)
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.body)
-                    .foregroundStyle(Color.ccSuccess)
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.ccStatusRunning)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -705,35 +810,35 @@ struct FloatingPanelView: View {
             if step.isExpanded {
                 ScrollView {
                     Text(step.resultText)
-                        .font(.callout)
-                        .foregroundStyle(.primary)
+                        .font(.ccSans(13))
+                        .foregroundStyle(Color.ccTextPrimary)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
+                        .padding(12)
                 }
                 .frame(maxHeight: 200)
-                .background(Color.ccSurfaceSunken.opacity(0.7))
-                .cornerRadius(CCRadius.sm)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
+                .background(resultWellBackground)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
             }
         }
     }
 
     private func currentActionRow(action: SuggestedAction) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 11) {
             Image(systemName: action.systemImage)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .frame(width: 20, alignment: .center)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(Color.ccTextSecondary)
+                .frame(width: 22, alignment: .center)
             Text(action.title)
-                .font(.body)
+                .font(.ccSans(14, weight: .semibold))
+                .foregroundStyle(Color.ccTextPrimary)
             Spacer()
             if viewModel.isGenerating {
                 Button(action: { viewModel.stopGeneration() }) {
                     Image(systemName: "stop.circle.fill")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.ccTextSecondary)
                 }
                 .buttonStyle(.plain)
             } else if case .processing = viewModel.processingState {
@@ -742,12 +847,12 @@ struct FloatingPanelView: View {
                     .tint(.ccAccent)
             } else if viewModel.processingState == .completed {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.body)
-                    .foregroundStyle(Color.ccSuccess)
+                    .font(.system(size: 17))
+                    .foregroundStyle(Color.ccStatusRunning)
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.vertical, 7)
     }
 
     private var currentResultSection: some View {
@@ -758,84 +863,106 @@ struct FloatingPanelView: View {
                         .controlSize(.small)
                         .tint(.ccAccent)
                     Text(message)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .font(.ccSans(13))
+                        .foregroundStyle(Color.ccTextSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
             } else if let text = viewModel.resultText, !text.isEmpty {
+                // Result well: inset surface-2 with a streaming caret.
                 ScrollView {
-                    Text(text)
-                        .font(.callout)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
+                    HStack(alignment: .bottom, spacing: 0) {
+                        Text(text)
+                            .font(.ccSans(13))
+                            .foregroundStyle(Color.ccTextPrimary)
+                            .lineSpacing(3)
+                            .textSelection(.enabled)
+                        if viewModel.isGenerating {
+                            StreamingCaret()
+                                .padding(.leading, 1)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(13)
                 }
                 .frame(maxHeight: 300)
-                .background(Color.ccSurfaceSunken.opacity(0.7))
-                .cornerRadius(CCRadius.sm)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
+                .background(resultWellBackground)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
 
                 // Copied to clipboard — below the result
                 if viewModel.isResultInClipboard, !viewModel.isGenerating {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 11) {
                         Image(systemName: "doc.on.clipboard")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 20, alignment: .center)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.ccTextSecondary)
+                            .frame(width: 22, alignment: .center)
                         Text("Copied to clipboard")
-                            .font(.body)
+                            .font(.ccSans(13.5))
+                            .foregroundStyle(Color.ccTextSecondary)
                         Spacer()
-                        Text("⌘V")
-                            .font(.system(size: 12, design: .monospaced))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.primary.opacity(0.07))
-                            .cornerRadius(CCRadius.xs)
-                            .foregroundStyle(.tertiary)
+                        KeyHint(text: "⌘V", filled: true)
                     }
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
                 }
             }
         }
     }
 
+    private var resultWellBackground: some View {
+        RoundedRectangle(cornerRadius: CCRadius.sm, style: .continuous)
+            .fill(Color.ccSurface2)
+            .overlay(
+                RoundedRectangle(cornerRadius: CCRadius.sm, style: .continuous)
+                    .strokeBorder(Color.ccBorder, lineWidth: 1)
+            )
+    }
+
     private var followUpSection: some View {
         VStack(spacing: 0) {
             if !viewModel.followUpActions.isEmpty {
+                Rectangle()
+                    .fill(Color.ccBorder)
+                    .frame(height: 1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+
                 Text("Follow-up actions")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.ccMono(10, weight: .semibold))
                     .textCase(.uppercase)
-                    .tracking(0.8)
-                    .foregroundStyle(.tertiary)
+                    .tracking(1.2)
+                    .foregroundStyle(Color.ccTextMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
                     .padding(.top, 6)
-                    .padding(.bottom, 3)
+                    .padding(.bottom, 4)
 
                 VStack(spacing: 2) {
                     ForEach(Array(viewModel.followUpActions.enumerated()), id: \.element.id) { index, action in
-                        ActionRow(action: action, isSelected: index == viewModel.selectedFollowUpIndex, index: index)
+                        ActionRow(action: action, isSelected: index == viewModel.selectedFollowUpIndex, compact: true)
                             .onTapGesture {
                                 viewModel.executeFollowUp(action)
                             }
                     }
                 }
-                .padding(.vertical, 2)
+                .padding(.horizontal, 2)
+                .padding(.bottom, 2)
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: 11) {
                 Image(systemName: "chevron.left")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20, alignment: .center)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.ccTextMuted)
+                    .frame(width: 22, alignment: .center)
                 Text("Back")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .font(.ccSans(13.5))
+                    .foregroundStyle(Color.ccTextMuted)
                 Spacer()
+                KeyHint(text: "esc")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -847,47 +974,111 @@ struct FloatingPanelView: View {
     }
 }
 
+// MARK: - Reusable pieces
+
+/// A bordered "machine voice" key hint (↑↓, esc, ⌘V).
+private struct KeyHint: View {
+    let text: String
+    var filled: Bool = false
+
+    var body: some View {
+        Text(text)
+            .font(.ccMono(12))
+            .foregroundStyle(Color.ccTextMuted)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1.5)
+            .background(
+                RoundedRectangle(cornerRadius: CCRadius.badge, style: .continuous)
+                    .fill(filled ? Color.ccSurface2 : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: CCRadius.badge, style: .continuous)
+                    .strokeBorder(Color.ccBorderStrong, lineWidth: 1)
+            )
+            .fixedSize()
+    }
+}
+
+/// The blinking caret that trails streaming result text (step-end, ~1.1s cycle).
+private struct StreamingCaret: View {
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.55)) { context in
+            let on = Int(context.date.timeIntervalSinceReferenceDate / 0.55) % 2 == 0
+            RoundedRectangle(cornerRadius: 0.5)
+                .fill(Color.ccAccent)
+                .frame(width: 2, height: 15)
+                .opacity(on ? 1 : 0)
+        }
+    }
+}
+
+/// Slow "agent alive" pulse for the working status dot.
+private struct PulseModifier: ViewModifier {
+    let active: Bool
+    @State private var dimmed = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(active ? (dimmed ? 0.4 : 1.0) : 1.0)
+            .onAppear {
+                guard active else { return }
+                withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                    dimmed = true
+                }
+            }
+    }
+}
+
 struct ActionRow: View {
     let action: SuggestedAction
     let isSelected: Bool
-    let index: Int
+    /// Compact single-line rows (follow-ups) hide the subtitle.
+    var compact: Bool = false
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 11) {
             Image(systemName: action.systemImage)
-                .font(.body)
-                .foregroundStyle(isSelected ? .white : .secondary)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(isSelected ? Color.white : Color.ccTextSecondary)
                 .frame(width: 22, alignment: .center)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(action.title)
-                    .font(.body)
-                    .foregroundStyle(isSelected ? .white : .primary)
-                if let subtitle = action.subtitle, !subtitle.isEmpty {
+                    .font(.ccSans(14, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(isSelected ? Color.white : Color.ccTextPrimary)
+                if !compact, let subtitle = action.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.caption2)
-                        .foregroundStyle(isSelected ? Color.white.opacity(0.72) : Color.secondary.opacity(0.6))
+                        .font(.ccSans(11))
+                        .foregroundStyle(isSelected ? Color.white.opacity(0.78) : Color.ccTextMuted)
+                        .lineLimit(1)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 4)
 
             if isSelected {
-                Image(systemName: "return")
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.6))
+                Text("↵")
+                    .font(.ccMono(12))
+                    .foregroundStyle(Color.white.opacity(0.9))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: CCRadius.badge, style: .continuous)
+                            .fill(Color.white.opacity(0.20))
+                    )
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: CCRadius.sm, style: .continuous)
-                .fill(isSelected ? Color.ccAccent : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
+                .fill(isSelected ? Color.ccAccent : (isHovered ? Color.ccSurface2 : Color.clear))
         )
-        .scaleEffect(isSelected ? 1.0 : (isHovered ? 1.01 : 1.0))
+        // Steel-blue tinted lift under the selected row (mirrors the design shadow).
+        .shadow(color: isSelected ? Color.ccAccent.opacity(0.40) : .clear, radius: 8, x: 0, y: 4)
         .animation(.spring(response: 0.25, dampingFraction: 0.9), value: isSelected)
-        .animation(.spring(response: 0.25, dampingFraction: 0.9), value: isHovered)
+        .animation(.easeOut(duration: 0.12), value: isHovered)
         .contentShape(Rectangle())
         .onHover { hovering in
             isHovered = hovering

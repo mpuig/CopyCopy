@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let updaterController: UpdaterProviding = makeUpdaterController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        BrandFonts.registerIfNeeded()
         NSApp.setActivationPolicy(.accessory)
     }
 }
