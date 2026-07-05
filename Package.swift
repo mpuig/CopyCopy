@@ -28,6 +28,9 @@ let package = Package(
                 "LlamaFramework",
             ],
             path: "Sources",
+            resources: [
+                .copy("Resources/Fonts")
+            ],
             linkerSettings: [
                 .linkedFramework("Cocoa"),
                 .linkedFramework("SwiftUI"),
