@@ -17,6 +17,13 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Whether the first-run permissions onboarding has been shown and dismissed.
+    @Published var hasCompletedOnboarding: Bool {
+        didSet {
+            UserDefaults.standard.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding")
+        }
+    }
+
     @Published var doubleCopyThresholdMs: Double {
         didSet {
             UserDefaults.standard.set(doubleCopyThresholdMs, forKey: "doubleCopyThresholdMs")
@@ -38,6 +45,7 @@ final class AppSettings: ObservableObject {
     init() {
         self.launchAtLogin = UserDefaults.standard.bool(forKey: "launchAtLogin")
         self.debugMenuEnabled = UserDefaults.standard.bool(forKey: "debugMenuEnabled")
+        self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
 
         let stored = UserDefaults.standard.double(forKey: "doubleCopyThresholdMs")
         self.doubleCopyThresholdMs = stored > 0 ? stored : 280

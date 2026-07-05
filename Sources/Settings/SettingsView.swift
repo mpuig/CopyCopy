@@ -15,7 +15,7 @@ struct SettingsView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            SettingsGeneralPane(settings: settings)
+            SettingsGeneralPane(settings: settings, model: model)
                 .tabItem { Label("General", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
 
