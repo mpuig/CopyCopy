@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.1 — 2026-07-05
+
+### Added
+- Auto-updates via Sparkle (EdDSA-signed) with appcast publishing.
+- Homebrew cask release publishing.
+- First-run onboarding explaining the required Accessibility/Input Monitoring permissions, plus live permission status with re-check in Settings → General.
+- Visibility into which built-in skills a custom `SKILL.md` has overridden, shown in Settings → General → Skills.
+
+### Improved
+- Suggested-action list is now capped to the most relevant matches instead of growing unbounded.
+- Clipboard classification/entity detection now runs off the main thread and is bounded for very large clipboard content, eliminating UI hitches on big copies.
+- Release builds are notarized via `sign_and_notarize.sh`.
+- Redesigned static docs site (copycopy.app).
+
+### Fixed
+- Potential crash in the on-device LLM inference path under memory pressure (unchecked C API allocations in the llama.cpp bridge).
+
+### Developer
+- CI now runs the full test suite (`swift test`) on every push/PR.
+- Fixed CI/release Xcode selection to avoid Swift-tools-version resolution failures.
+- Removed accidentally committed `node_modules` and release zip artifacts from the repository.
+
 ## Unreleased
 
 ### Added
