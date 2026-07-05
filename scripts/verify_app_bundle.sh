@@ -22,6 +22,23 @@ if [[ ! -d "$APP/Contents/Resources/KeyboardShortcuts_KeyboardShortcuts.bundle" 
   fail "Missing KeyboardShortcuts resource bundle"
 fi
 
+# Every resource bundle must carry a loadable Info.plist. Without one, macOS
+# Bundle(url:) returns nil and the SwiftPM-generated Bundle.module accessor traps
+# with a fatalError at launch (this shipped broken in v0.5.0 via CopyCopy_CopyCopy.bundle).
+log "==> Checking every resource bundle has a loadable Info.plist"
+for bundle in "$APP/Contents/Resources/"*.bundle; do
+  [[ -d "$bundle" ]] || continue
+  if [[ -f "$bundle/Info.plist" ]]; then
+    plist="$bundle/Info.plist"
+  elif [[ -f "$bundle/Contents/Info.plist" ]]; then
+    plist="$bundle/Contents/Info.plist"
+  else
+    fail "Resource bundle $(basename "$bundle") has no Info.plist — Bundle.module will crash at launch"
+  fi
+  plutil -lint "$plist" >/dev/null || fail "Invalid Info.plist in $(basename "$bundle")"
+  log "  OK: $(basename "$bundle")"
+done
+
 log "==> Checking embedded frameworks (optional)"
 if [[ -d "$APP/Contents/Frameworks/Sparkle.framework" ]]; then
   log "Sparkle.framework present"

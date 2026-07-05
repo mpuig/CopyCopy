@@ -56,6 +56,37 @@ for bundle in "$ARM_BUILD_DIR"/*.bundle; do
 done
 shopt -u nullglob
 
+# `swift build` emits resource bundles declared with `.copy` (e.g. the app's own
+# CopyCopy_CopyCopy.bundle of Fonts) WITHOUT an Info.plist. macOS Bundle(url:)
+# refuses to load such a bundle, so the generated `Bundle.module` accessor traps
+# with a fatalError at launch (BrandFonts.registerIfNeeded crashes on startup).
+# Synthesize a minimal Info.plist for any copied bundle that lacks one so it loads.
+shopt -s nullglob
+for bundle in "$APP_DIR/Contents/Resources/"*.bundle; do
+    [ -d "$bundle" ] || continue
+    if [ ! -f "$bundle/Info.plist" ] && [ ! -f "$bundle/Contents/Info.plist" ]; then
+        bundle_name="$(basename "$bundle" .bundle)"
+        bundle_id_suffix="$(printf '%s' "$bundle_name" | tr '_' '-')"
+        cat > "$bundle/Info.plist" <<BPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleIdentifier</key><string>${BUNDLE_ID}.resources.${bundle_id_suffix}</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>${bundle_name}</string>
+  <key>CFBundlePackageType</key><string>BNDL</string>
+  <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+  <key>CFBundleVersion</key><string>${BUILD}</string>
+</dict>
+</plist>
+BPLIST
+        echo "  Added missing Info.plist to $(basename "$bundle")"
+    fi
+done
+shopt -u nullglob
+
 # Copy Sparkle.framework (if present) into Frameworks.
 SPARKLE_SRC="$ARM_BUILD_DIR/Sparkle.framework"
 if [ -d "$SPARKLE_SRC" ]; then

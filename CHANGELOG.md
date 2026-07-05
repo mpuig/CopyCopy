@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1 — 2026-07-05
+
+### Fixed
+- **Crash on launch (v0.5.0)** — release builds (`build.sh` / `swift build`) emitted the app's own `CopyCopy_CopyCopy.bundle` (brand fonts) without an `Info.plist`, so macOS `Bundle(url:)` refused to load it and the SwiftPM `Bundle.module` accessor trapped during `BrandFonts.registerIfNeeded()` at startup. `build.sh` now synthesizes a minimal `Info.plist` for any resource bundle missing one.
+
+### Developer
+- `scripts/verify_app_bundle.sh` now fails if any resource bundle lacks a lint-clean `Info.plist` (previously only checked for KeyboardShortcuts).
+- Release workflow now smoke-launches the built app and fails if it crashes on startup — the release pipeline previously never executed the app, so a reproducible launch crash shipped notarized.
+
 ## 0.5.0 — 2026-07-05
 
 ### Added

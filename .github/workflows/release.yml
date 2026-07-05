@@ -76,6 +76,29 @@ jobs:
         run: |
           ./scripts/verify_app_bundle.sh
 
+      - name: Smoke test (launch app, ensure it doesn't crash on startup)
+        run: |
+          set -euo pipefail
+          APP="dist/CopyCopy.app"
+          BIN="$APP/Contents/MacOS/CopyCopy"
+          # Snapshot existing crash reports so we only inspect new ones.
+          crashes_before="$(ls ~/Library/Logs/DiagnosticReports/CopyCopy-*.ips 2>/dev/null | wc -l | tr -d ' ')"
+          open "$APP" || true
+          sleep 8
+          if pgrep -f "$BIN" >/dev/null; then
+            echo "OK: CopyCopy is still running 8s after launch"
+            pkill -f "$BIN" 2>/dev/null || true
+            exit 0
+          fi
+          echo "ERROR: CopyCopy is not running — it crashed on launch" >&2
+          crashes_after="$(ls ~/Library/Logs/DiagnosticReports/CopyCopy-*.ips 2>/dev/null | wc -l | tr -d ' ')"
+          if [[ "$crashes_after" -gt "$crashes_before" ]]; then
+            latest="$(ls -t ~/Library/Logs/DiagnosticReports/CopyCopy-*.ips | head -1)"
+            echo "----- $latest -----" >&2
+            cat "$latest" >&2 || true
+          fi
+          exit 1
+
       - name: Sign, notarize, and staple
         if: github.event_name == 'release'
         env:
