@@ -60,18 +60,39 @@ class FloatingActionPanel: NSPanel {
             guard let self else { return event }
             guard event.window === self else { return event }
 
-            if event.keyCode == 53 {
-                if self.contentViewModel.isGenerating {
-                    self.contentViewModel.stopGeneration()
-                } else if self.contentViewModel.executedAction != nil {
-                    self.contentViewModel.resetToActions()
+            // The ask TextField is always focused, so ↑/↓/Return/Esc are
+            // intercepted here (before the field's editor sees them) to drive
+            // the shortcut list and freeform routing. Other keys (typing,
+            // ←/→ cursor motion) fall through to the field.
+            let vm = self.contentViewModel
+            switch event.keyCode {
+            case 126: // up
+                vm.selectPrevious()
+                return nil
+            case 125: // down
+                vm.selectNext()
+                return nil
+            case 36: // return
+                if vm.executedAction == nil {
+                    vm.handleTriggerReturn()
+                } else {
+                    vm.executeSelected()
+                }
+                return nil
+            case 53: // esc
+                if vm.executedAction == nil, !vm.askText.isEmpty {
+                    vm.askText = ""
+                } else if vm.isGenerating {
+                    vm.stopGeneration()
+                } else if vm.executedAction != nil {
+                    vm.resetToActions()
                 } else {
                     self.close()
                 }
                 return nil
+            default:
+                return event
             }
-
-            return event
         }
     }
 
@@ -122,13 +143,14 @@ class FloatingActionPanel: NSPanel {
     }
 
     private func desiredPanelHeight() -> CGFloat {
+        // Trigger state adds the always-focused ask field above the shortcuts.
         if contentViewModel.executedAction == nil {
-            return min(300, 100 + CGFloat(contentViewModel.actions.count) * 50)
+            return min(320, 150 + CGFloat(contentViewModel.actions.count) * 50)
         }
 
         switch contentViewModel.processingState {
         case .idle:
-            return min(300, 100 + CGFloat(contentViewModel.actions.count) * 50)
+            return min(320, 150 + CGFloat(contentViewModel.actions.count) * 50)
         case .processing:
             return 150
         case .completed:
@@ -170,9 +192,16 @@ class FloatingActionPanel: NSPanel {
         switch event.keyCode {
         case 126: contentViewModel.selectPrevious()
         case 125: contentViewModel.selectNext()
-        case 36: contentViewModel.executeSelected()
+        case 36:
+            if contentViewModel.executedAction == nil {
+                contentViewModel.handleTriggerReturn()
+            } else {
+                contentViewModel.executeSelected()
+            }
         case 53:
-            if contentViewModel.isGenerating {
+            if contentViewModel.executedAction == nil, !contentViewModel.askText.isEmpty {
+                contentViewModel.askText = ""
+            } else if contentViewModel.isGenerating {
                 contentViewModel.stopGeneration()
             } else if contentViewModel.executedAction != nil {
                 contentViewModel.resetToActions()
@@ -210,6 +239,17 @@ class FloatingPanelViewModel: ObservableObject {
     ]
 
     @Published var actions: [SuggestedAction]
+    /// The always-focused freeform ask text at the top of the trigger state.
+    @Published var askText: String = "" {
+        didSet {
+            // Typing returns focus to the box: the shortcut highlight only
+            // reappears once the user arrows back into the list.
+            if !askText.isEmpty { isListFocused = false }
+        }
+    }
+    /// Whether the user has arrowed into the shortcut list. While `false` no row
+    /// is highlighted (the ask field owns input); Return then runs freeform.
+    @Published var isListFocused: Bool = false
     @Published var selectedIndex: Int = 0
     @Published var processingState: ProcessingState = .idle
     @Published var executedAction: SuggestedAction?
@@ -301,7 +341,13 @@ class FloatingPanelViewModel: ObservableObject {
         if processingState == .completed, !followUpActions.isEmpty {
             selectedFollowUpIndex = (selectedFollowUpIndex - 1 + followUpActions.count) % followUpActions.count
         } else if processingState == .idle, !actions.isEmpty {
-            selectedIndex = (selectedIndex - 1 + actions.count) % actions.count
+            if !isListFocused {
+                // First arrow into the list highlights the last row (up).
+                isListFocused = true
+                selectedIndex = actions.count - 1
+            } else {
+                selectedIndex = (selectedIndex - 1 + actions.count) % actions.count
+            }
         }
     }
 
@@ -309,7 +355,13 @@ class FloatingPanelViewModel: ObservableObject {
         if processingState == .completed, !followUpActions.isEmpty {
             selectedFollowUpIndex = (selectedFollowUpIndex + 1) % followUpActions.count
         } else if processingState == .idle, !actions.isEmpty {
-            selectedIndex = (selectedIndex + 1) % actions.count
+            if !isListFocused {
+                // First arrow into the list highlights the first row (down).
+                isListFocused = true
+                selectedIndex = 0
+            } else {
+                selectedIndex = (selectedIndex + 1) % actions.count
+            }
         }
     }
 
@@ -320,7 +372,84 @@ class FloatingPanelViewModel: ObservableObject {
             return
         }
         guard processingState == .idle, selectedIndex < actions.count else { return }
-        let action = actions[selectedIndex]
+        run(actions[selectedIndex])
+    }
+
+    /// Return handling for the trigger state, in priority order:
+    /// 1) an actively highlighted shortcut → run it,
+    /// 2) a non-empty ask box → run the freeform ask,
+    /// 3) an empty box → run the top-ranked action.
+    func handleTriggerReturn() {
+        guard processingState == .idle else { return }
+        if isListFocused, selectedIndex < actions.count {
+            run(actions[selectedIndex])
+            return
+        }
+        let ask = askText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !ask.isEmpty {
+            submitFreeform()
+            return
+        }
+        guard !actions.isEmpty else { return }
+        selectedIndex = 0
+        run(actions[0])
+    }
+
+    /// Builds and runs the freeform ask currently typed in the box.
+    func submitFreeform() {
+        let ask = askText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !ask.isEmpty, processingState == .idle else { return }
+        run(makeFreeformAction(ask: ask))
+    }
+
+    /// Synthesizes a `SuggestedAction` for a freeform ask. Routes to a tuned
+    /// skill when the ask clearly matches one (skill-grade quality); otherwise
+    /// runs the generic wrapped `.llmPrompt` over the preprocessed clipboard.
+    func makeFreeformAction(ask: String) -> SuggestedAction {
+        if let routed = skillLoader.freeformSkillMatch(for: ask, context: context, executor: executor) {
+            return routed
+        }
+
+        let systemPrompt = Self.freeformSystemPrompt(ask: ask)
+        let clipboardText = ClipboardTextPreprocessor.bestLLMInput(from: context.snapshot)
+            ?? context.snapshot.plainText
+            ?? context.snapshot.url?.absoluteString
+            ?? ""
+        let ctx = context
+
+        return SuggestedAction(
+            skillId: "freeform",
+            title: ask,
+            subtitle: "Freeform ask",
+            systemImage: "sparkles"
+        ) { [weak executor] completion, onToken in
+            guard let executor else { return nil }
+            return executor.runFreeformPrompt(
+                prompt: clipboardText,
+                systemPrompt: systemPrompt,
+                temperature: 0.2,
+                context: ctx,
+                completion: completion,
+                onToken: onToken
+            )
+        }
+    }
+
+    /// Fixed wrapper constraining the small local model around the user's ask.
+    static func freeformSystemPrompt(ask: String) -> String {
+        """
+        You act on the user's copied text below. Do exactly what the user asks.
+        Rules:
+        - Output only the result — no preamble, no explanation, no "Sure" / "Here is".
+        - Preserve formatting, code, URLs, names, and the original language unless asked otherwise.
+        - Do not invent facts, quotes, numbers, or details not present in the text.
+        - If the request cannot be done from the text, say so in one short sentence.
+
+        User request: \(ask)
+        """
+    }
+
+    private func run(_ action: SuggestedAction) {
         let executionID = UUID()
         activeExecutionID = executionID
         resultText = nil
@@ -567,6 +696,8 @@ class FloatingPanelViewModel: ObservableObject {
         selectedFollowUpIndex = 0
         processingState = .idle
         selectedIndex = 0
+        isListFocused = false
+        askText = ""
     }
 }
 
@@ -593,6 +724,7 @@ enum ProcessingState: Equatable {
 
 struct FloatingPanelView: View {
     @ObservedObject var viewModel: FloatingPanelViewModel
+    @FocusState private var askFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -601,6 +733,7 @@ struct FloatingPanelView: View {
             if viewModel.executedAction != nil {
                 executedSection
             } else {
+                askFieldSection
                 panelDivider
                 actionsSection
             }
@@ -631,6 +764,44 @@ struct FloatingPanelView: View {
         .shadow(color: .black.opacity(0.30), radius: 24, x: 0, y: 14)
         .shadow(color: .black.opacity(0.16), radius: 8, x: 0, y: 4)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.executedAction != nil)
+    }
+
+    // MARK: Ask field (freeform)
+
+    private var askFieldSection: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.ccAccent)
+                .frame(width: 18, alignment: .center)
+
+            TextField("Ask anything about this…", text: $viewModel.askText)
+                .textFieldStyle(.plain)
+                .font(.ccSans(14))
+                .foregroundStyle(Color.ccTextPrimary)
+                .tint(Color.ccAccent)
+                .focused($askFieldFocused)
+
+            if !viewModel.askText.isEmpty {
+                KeyHint(text: "↵", filled: true)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: CCRadius.sm, style: .continuous)
+                .fill(Color.ccSurface2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: CCRadius.sm, style: .continuous)
+                        .strokeBorder(
+                            askFieldFocused && !viewModel.isListFocused ? Color.ccAccent.opacity(0.55) : Color.ccBorder,
+                            lineWidth: 1
+                        )
+                )
+        )
+        .padding(.horizontal, 8)
+        .padding(.top, 2)
+        .onAppear { askFieldFocused = true }
     }
 
     private var panelDivider: some View {
@@ -732,7 +903,7 @@ struct FloatingPanelView: View {
                     ForEach(Array(viewModel.actions.enumerated()), id: \.element.id) { index, action in
                         ActionRow(
                             action: action,
-                            isSelected: index == viewModel.selectedIndex,
+                            isSelected: viewModel.isListFocused && index == viewModel.selectedIndex,
                             compact: false
                         )
                         .id(index)
