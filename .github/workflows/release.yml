@@ -106,7 +106,11 @@ jobs:
           BIN="$APP/Contents/MacOS/CopyCopy"
           DIAG="$HOME/Library/Logs/DiagnosticReports"
           mkdir -p "$DIAG"
-          before="$(ls "$DIAG"/CopyCopy-*.ips 2>/dev/null | wc -l | tr -d ' ')"
+          # Use find (exits 0 with no matches) — a globbing `ls` would exit non-zero
+          # with zero crash reports and, under the runner's `bash -eo pipefail`,
+          # abort this step before the app is even launched.
+          count_crashes() { find "$DIAG" -maxdepth 1 -name 'CopyCopy-*.ips' 2>/dev/null | wc -l | tr -d ' '; }
+          before="$(count_crashes)"
 
           # Runs AFTER signing so it exercises the real shipped artifact under
           # hardened runtime — the condition under which the v0.5.0 Bundle.module
@@ -134,10 +138,10 @@ jobs:
             echo "Process exited on its own with code $code."
           fi
 
-          after="$(ls "$DIAG"/CopyCopy-*.ips 2>/dev/null | wc -l | tr -d ' ')"
+          after="$(count_crashes)"
           if [[ "$after" -gt "$before" ]]; then
             echo "::error::CopyCopy produced a crash report on launch"
-            latest="$(ls -t "$DIAG"/CopyCopy-*.ips | head -1)"
+            latest="$(find "$DIAG" -maxdepth 1 -name 'CopyCopy-*.ips' -print0 | xargs -0 ls -t 2>/dev/null | head -1)"
             echo "----- $latest -----"; cat "$latest" || true
             exit 1
           fi
