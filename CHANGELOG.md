@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 — 2026-07-05
+
+### Added
+- **Freeform ask** — a text field at the top of the action panel: type any request against what you copied ("rewrite formally", "make this 3 bullets", "what does this do") and get the answer streamed back, on-device. Requests that match a built-in skill are routed to that skill's tuned prompt; everything else runs a constrained general prompt.
+
+### Changed
+- **Redesigned floating action panel** — the "Foundry" design system with a steel-blue accent, machined radii, warm concrete surfaces, and DM Sans / IBM Plex Mono typography. Both the ranked-actions and result states were rebuilt; the Foundry tokens are now adopted app-wide (Settings, Onboarding).
+
 ## 0.4.1 — 2026-07-05
 
 ### Added
