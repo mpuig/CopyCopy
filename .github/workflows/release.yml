@@ -134,41 +134,10 @@ jobs:
           TAG="${{ github.event.release.tag_name }}"
           gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --clobber
 
-      - name: Update Homebrew cask
-        if: github.event_name == 'release'
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          if [[ -z "${HOMEBREW_TAP_TOKEN}" ]]; then
-            echo "Missing secret: HOMEBREW_TAP_TOKEN" >&2
-            exit 1
-          fi
-
-          TAG="${{ github.event.release.tag_name }}"
-          VERSION="${TAG#v}"
-          ASSET="${{ steps.package.outputs.asset }}"
-          SHA256="$(shasum -a 256 "$ASSET" | awk '{print $1}')"
-          export VERSION SHA256
-          TAP_DIR="$RUNNER_TEMP/homebrew-copycopy"
-
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/mpuig/homebrew-copycopy.git" "$TAP_DIR"
-          cd "$TAP_DIR"
-
-          ruby -0pi -e 'gsub(/version "[^"]+"/, "version \"#{ENV.fetch("VERSION")}\""); gsub(/sha256 "[0-9a-f]+"/, "sha256 \"#{ENV.fetch("SHA256")}\"")' Casks/copycopy.rb
-
-          if git diff --quiet; then
-            echo "Homebrew cask already up to date."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Casks/copycopy.rb
-          git commit -m "copycopy ${VERSION}"
-          git push origin main
-
+      # Publish the Sparkle appcast BEFORE the Homebrew cask. The appcast is the
+      # in-app auto-update mechanism and is the more important of the two publish
+      # steps; ordering it first means a failure in the cask step (e.g. a missing
+      # or under-scoped HOMEBREW_TAP_TOKEN) can no longer skip auto-update delivery.
       - name: Publish Sparkle appcast
         if: github.event_name == 'release'
         env:
@@ -219,6 +188,41 @@ jobs:
           git add docs/appcast.xml
           git commit -m "appcast: CopyCopy ${VERSION}"
           git push origin HEAD:main
+
+      - name: Update Homebrew cask
+        if: github.event_name == 'release'
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${HOMEBREW_TAP_TOKEN}" ]]; then
+            echo "Missing secret: HOMEBREW_TAP_TOKEN" >&2
+            exit 1
+          fi
+
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          ASSET="${{ steps.package.outputs.asset }}"
+          SHA256="$(shasum -a 256 "$ASSET" | awk '{print $1}')"
+          export VERSION SHA256
+          TAP_DIR="$RUNNER_TEMP/homebrew-copycopy"
+
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/mpuig/homebrew-copycopy.git" "$TAP_DIR"
+          cd "$TAP_DIR"
+
+          ruby -0pi -e 'gsub(/version "[^"]+"/, "version \"#{ENV.fetch("VERSION")}\""); gsub(/sha256 "[0-9a-f]+"/, "sha256 \"#{ENV.fetch("SHA256")}\"")' Casks/copycopy.rb
+
+          if git diff --quiet; then
+            echo "Homebrew cask already up to date."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/copycopy.rb
+          git commit -m "copycopy ${VERSION}"
+          git push origin main
 
       - name: Upload workflow artifact (manual runs)
         if: github.event_name != 'release'
