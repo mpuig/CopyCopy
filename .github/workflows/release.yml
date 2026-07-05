@@ -76,29 +76,6 @@ jobs:
         run: |
           ./scripts/verify_app_bundle.sh
 
-      - name: Smoke test (launch app, ensure it doesn't crash on startup)
-        run: |
-          set -euo pipefail
-          APP="dist/CopyCopy.app"
-          BIN="$APP/Contents/MacOS/CopyCopy"
-          # Snapshot existing crash reports so we only inspect new ones.
-          crashes_before="$(ls ~/Library/Logs/DiagnosticReports/CopyCopy-*.ips 2>/dev/null | wc -l | tr -d ' ')"
-          open "$APP" || true
-          sleep 8
-          if pgrep -f "$BIN" >/dev/null; then
-            echo "OK: CopyCopy is still running 8s after launch"
-            pkill -f "$BIN" 2>/dev/null || true
-            exit 0
-          fi
-          echo "ERROR: CopyCopy is not running — it crashed on launch" >&2
-          crashes_after="$(ls ~/Library/Logs/DiagnosticReports/CopyCopy-*.ips 2>/dev/null | wc -l | tr -d ' ')"
-          if [[ "$crashes_after" -gt "$crashes_before" ]]; then
-            latest="$(ls -t ~/Library/Logs/DiagnosticReports/CopyCopy-*.ips | head -1)"
-            echo "----- $latest -----" >&2
-            cat "$latest" >&2 || true
-          fi
-          exit 1
-
       - name: Sign, notarize, and staple
         if: github.event_name == 'release'
         env:
@@ -121,6 +98,55 @@ jobs:
           # the app with the Developer ID identity, then notarizes and staples the
           # ticket into the bundle — so the zip created below ships stapled.
           ./scripts/sign_and_notarize.sh
+
+      - name: Smoke test signed app (fail only on a startup crash)
+        run: |
+          set -uo pipefail
+          APP="dist/CopyCopy.app"
+          BIN="$APP/Contents/MacOS/CopyCopy"
+          DIAG="$HOME/Library/Logs/DiagnosticReports"
+          mkdir -p "$DIAG"
+          before="$(ls "$DIAG"/CopyCopy-*.ips 2>/dev/null | wc -l | tr -d ' ')"
+
+          # Runs AFTER signing so it exercises the real shipped artifact under
+          # hardened runtime — the condition under which the v0.5.0 Bundle.module
+          # trap actually fired (an unsigned/ad-hoc build does not reproduce it).
+          # The trap is a fatalError -> SIGTRAP (exit 133) plus an .ips crash
+          # report. A menu-bar (LSUIElement) app cannot hold a GUI session on the
+          # headless runner, so "no longer running" is NOT a failure by itself —
+          # only real crash evidence (a new crash report, or death by a fatal
+          # signal) fails the release. Deterministic bundle-structure regressions
+          # are already caught by verify_app_bundle.sh above.
+          "$BIN" >/tmp/cc_out.log 2>/tmp/cc_err.log &
+          pid=$!
+          for _ in $(seq 1 8); do
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+          done
+
+          code=0
+          if kill -0 "$pid" 2>/dev/null; then
+            echo "OK: still alive 8s after launch — no startup crash."
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+          else
+            wait "$pid" 2>/dev/null; code=$?
+            echo "Process exited on its own with code $code."
+          fi
+
+          after="$(ls "$DIAG"/CopyCopy-*.ips 2>/dev/null | wc -l | tr -d ' ')"
+          if [[ "$after" -gt "$before" ]]; then
+            echo "::error::CopyCopy produced a crash report on launch"
+            latest="$(ls -t "$DIAG"/CopyCopy-*.ips | head -1)"
+            echo "----- $latest -----"; cat "$latest" || true
+            exit 1
+          fi
+          if [[ "$code" -gt 128 ]]; then
+            echo "::error::CopyCopy was killed by signal $((code - 128)) on launch"
+            echo "--- stderr ---"; cat /tmp/cc_err.log || true
+            exit 1
+          fi
+          echo "No startup crash detected."
 
       - name: Package app bundle
         id: package
