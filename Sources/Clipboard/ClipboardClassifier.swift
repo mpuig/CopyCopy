@@ -1,7 +1,20 @@
 import Cocoa
 import NaturalLanguage
 
-final class ClipboardClassifier {
+final class ClipboardClassifier: Sendable {
+    /// Upper bound on the number of characters fed into the expensive entity/format/
+    /// language detection pipeline (regex, NSDataDetector, NLTagger, full-string scans).
+    /// Detection cost scales linearly with length, so we bound pathologically large
+    /// clipboard content (multi-MB logs, HTML dumps, blobs) while preserving accuracy
+    /// for normal, large-but-reasonable payloads. The full text is still stored and its
+    /// real character count is still reported in the summary.
+    private static let maxDetectionLength = 50_000
+
+    /// Truncates text to `maxDetectionLength` characters before running detection.
+    private func boundedForDetection(_ text: String) -> String {
+        String(text.prefix(Self.maxDetectionLength))
+    }
+
     // Pre-compiled regex patterns for entity detection
     private static let emailRegex = try! NSRegularExpression(pattern: #"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"#)
     private static let hexColorRegex = try! NSRegularExpression(pattern: #"^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$"#)
@@ -75,7 +88,7 @@ final class ClipboardClassifier {
             }
 
             // Detect entities (phone, date, address) and named entities (name, place, org)
-            let entity = detectEntity(from: trimmed)
+            let entity = detectEntity(from: boundedForDetection(trimmed))
             var entities = entity == .none ? [] : [entity]
             if htmlPreference == .semanticWebContent {
                 entities.append(.html)
@@ -115,7 +128,7 @@ final class ClipboardClassifier {
 
         if let text = plainTextFromRTFRepresentation(from: pasteboard), !text.isEmpty {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            let entity = detectEntity(from: trimmed)
+            let entity = detectEntity(from: boundedForDetection(trimmed))
             let entities = entity == .none ? [] : [entity]
             let entitySuffix = entities.isEmpty ? "" : " • " + entities.map(\.displayName).joined(separator: ", ")
             let short = trimmed.count > 140 ? String(trimmed.prefix(140)) + "…" : trimmed
@@ -184,7 +197,10 @@ final class ClipboardClassifier {
     }
 
     private func classifyHTMLPreference(_ html: String) -> HTMLPreference {
-        let normalized = html.lowercased()
+        // Bound the scan: full-string lowercasing + repeated `contains` over a multi-MB
+        // HTML blob is a main-thread hazard. Semantic markers appear early, so a prefix
+        // is sufficient to classify web content vs. editor/ambiguous markup.
+        let normalized = String(html.prefix(Self.maxDetectionLength)).lowercased()
         var score = 0
 
         let strongSemanticTags = ["<article", "<main", "<section"]

@@ -27,6 +27,15 @@ final class AppModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var floatingPanel: FloatingActionPanel?
 
+    /// Serial queue for the expensive clipboard classification / entity-detection
+    /// pipeline. Reading the pasteboard and running detection off the main thread keeps
+    /// the UI responsive even for large clipboard content and legitimate double-⌘C
+    /// invocations.
+    private let classificationQueue = DispatchQueue(
+        label: "com.copycopy.clipboard-classification",
+        qos: .userInitiated
+    )
+
     private enum Constants {
         /// First clipboard capture attempt delay (80ms) - Quick initial check to capture immediately available content
         static let clipboardCaptureDelay1: UInt64 = 80_000_000
@@ -77,13 +86,21 @@ final class AppModel: ObservableObject {
 
         pasteboardMonitor.onChange = { [weak self] changeCount in
             guard let self else { return }
-            let snapshot = self.classifier.snapshot(from: .general, changeCount: changeCount)
-
-            let now = CACurrentMediaTime()
-            let copyEvent = self.lastCopyKeyEvent.flatMap { (now - $0.timestamp) <= Constants.copyEventWindowSeconds ? $0 : nil }
-            self.lastClipboardContext = ClipboardContext(copyEvent: copyEvent, snapshot: snapshot, capturedAt: now)
-            self.statusText = snapshot.summary
-            self.refreshSuggestions()
+            // Passive precompute for snappy panel display / menu-bar state. Runs off the
+            // main thread so a large background copy never hitches the UI. Applied only if
+            // no newer/equal snapshot (e.g. from a double-⌘C trigger) has superseded it.
+            self.classifyInBackground(changeCount: changeCount) { [weak self] snapshot in
+                guard let self else { return }
+                if let existing = self.lastClipboardContext,
+                   existing.snapshot.changeCount >= changeCount {
+                    return
+                }
+                let now = CACurrentMediaTime()
+                let copyEvent = self.lastCopyKeyEvent.flatMap { (now - $0.timestamp) <= Constants.copyEventWindowSeconds ? $0 : nil }
+                self.lastClipboardContext = ClipboardContext(copyEvent: copyEvent, snapshot: snapshot, capturedAt: now)
+                self.statusText = snapshot.summary
+                self.refreshSuggestions()
+            }
         }
         pasteboardMonitor.start()
 
@@ -204,10 +221,30 @@ final class AppModel: ObservableObject {
             return
         }
 
-        let snapshot = classifier.snapshot(from: .general, changeCount: changeCount)
-        lastClipboardContext = ClipboardContext(copyEvent: copyEvent, snapshot: snapshot, capturedAt: capturedAt)
-        statusText = snapshot.summary
-        refreshSuggestions()
+        let triggerTime = lastTriggerTimestamp
+        classifyInBackground(changeCount: changeCount) { [weak self] snapshot in
+            guard let self else { return }
+            // Drop stale results if a newer trigger flow started meanwhile.
+            guard self.lastTriggerTimestamp == triggerTime else { return }
+            self.lastClipboardContext = ClipboardContext(copyEvent: copyEvent, snapshot: snapshot, capturedAt: capturedAt)
+            self.statusText = snapshot.summary
+            self.refreshSuggestions()
+        }
+    }
+
+    /// Runs the expensive `ClipboardClassifier.snapshot` (pasteboard read + entity
+    /// detection) on a background queue, then delivers the result back on the main actor.
+    private func classifyInBackground(
+        changeCount: Int,
+        completion: @escaping @MainActor (ClipboardSnapshot) -> Void
+    ) {
+        let classifier = self.classifier
+        classificationQueue.async {
+            let snapshot = classifier.snapshot(from: .general, changeCount: changeCount)
+            Task { @MainActor in
+                completion(snapshot)
+            }
+        }
     }
 
     func refreshSuggestions() {

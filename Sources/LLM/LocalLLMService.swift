@@ -359,16 +359,27 @@ actor LlamaContext {
     private func applyGGUFTemplate(systemPrompt: String, userPrompt: String) -> String? {
         guard let templateString else { return nil }
 
-        var messages = [
-            llama_chat_message(role: strdup("system"), content: strdup(systemPrompt)),
-            llama_chat_message(role: strdup("user"), content: strdup(userPrompt)),
-        ]
+        // Duplicate all C strings up front so we can free them via defer even on
+        // partial-allocation failure. strdup returns nil if malloc fails.
+        let systemRole = strdup("system")
+        let systemContent = strdup(systemPrompt)
+        let userRole = strdup("user")
+        let userContent = strdup(userPrompt)
         defer {
-            for msg in messages {
-                free(UnsafeMutablePointer(mutating: msg.role))
-                free(UnsafeMutablePointer(mutating: msg.content))
-            }
+            free(systemRole)
+            free(systemContent)
+            free(userRole)
+            free(userContent)
         }
+        // If any duplication failed, fall back to the hardcoded template.
+        guard systemRole != nil, systemContent != nil, userRole != nil, userContent != nil else {
+            return nil
+        }
+
+        var messages = [
+            llama_chat_message(role: systemRole, content: systemContent),
+            llama_chat_message(role: userRole, content: userContent),
+        ]
 
         let bufSize: Int32 = 8192
         let buf = UnsafeMutablePointer<CChar>.allocate(capacity: Int(bufSize))
@@ -397,7 +408,9 @@ actor LlamaContext {
 
         // Build sampler chain: top_k → top_p → min_p → temp → dist
         let sparams = llama_sampler_chain_default_params()
-        let sampler = llama_sampler_chain_init(sparams)!
+        guard let sampler = llama_sampler_chain_init(sparams) else {
+            throw LocalLLMError.generationFailed(NSError(domain: "llama", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to allocate sampler chain"]))
+        }
         llama_sampler_chain_add(sampler, llama_sampler_init_top_k(64))
         llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.95, 1))
         llama_sampler_chain_add(sampler, llama_sampler_init_min_p(0.05, 1))
