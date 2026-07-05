@@ -11,6 +11,7 @@ struct CopyCopyApp: App {
     @StateObject private var settings: AppSettings
     @State private var isMenuPresented = false
     @State private var statusItem: NSStatusItem?
+    @State private var hasEvaluatedOnboarding = false
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -40,12 +41,21 @@ struct CopyCopyApp: App {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 model.refreshRuntimeAccessStatus()
+                presentOnboardingIfNeeded()
             }
         }
 
         Settings {
             SettingsView(settings: settings, model: model, updater: appDelegate.updaterController)
         }
+    }
+
+    /// Shows first-run onboarding once per launch, only if the user hasn't completed
+    /// it yet. The controller itself no-ops when onboarding was already finished.
+    private func presentOnboardingIfNeeded() {
+        guard !hasEvaluatedOnboarding else { return }
+        hasEvaluatedOnboarding = true
+        OnboardingWindowController.shared.presentIfNeeded(settings: settings, model: model)
     }
 
     private func pulseStatusItem() {

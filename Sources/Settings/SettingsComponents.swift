@@ -71,6 +71,43 @@ struct SettingsSection<Content: View>: View {
 }
 
 @MainActor
+struct PermissionStatusRow: View {
+    let title: String
+    let description: String
+    let isGranted: Bool
+    let openAction: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: isGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(isGranted ? Color.ccSuccess : Color.ccDanger)
+                .font(.body)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.body)
+                    Text(isGranted ? "Granted" : "Not granted")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(isGranted ? Color.ccSuccess : Color.ccDanger)
+                }
+                Text(description)
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            if !isGranted {
+                Button("Open Settings", action: openAction)
+                    .controlSize(.small)
+            }
+        }
+    }
+}
+
+@MainActor
 struct AboutLinkRow: View {
     let icon: String
     let title: String

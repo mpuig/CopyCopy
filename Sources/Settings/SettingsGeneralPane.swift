@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 struct SettingsGeneralPane: View {
     @ObservedObject var settings: AppSettings
+    @ObservedObject var model: AppModel
     @ObservedObject var localLLM = LocalLLMService.shared
 
     var body: some View {
@@ -18,6 +19,10 @@ struct SettingsGeneralPane: View {
                         subtitle: "Automatically opens CopyCopy when you start your Mac.",
                         binding: $settings.launchAtLogin)
                 }
+
+                Divider()
+
+                permissionsSection
 
                 Divider()
 
@@ -91,6 +96,35 @@ struct SettingsGeneralPane: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
+        }
+    }
+
+    private var permissionsSection: some View {
+        SettingsSection(contentSpacing: 12) {
+            HStack {
+                Text("Permissions")
+                    .font(.headline)
+                Spacer()
+                Button("Re-check") {
+                    model.refreshRuntimeAccessStatus()
+                }
+                .controlSize(.small)
+            }
+
+            PermissionStatusRow(
+                title: "Accessibility",
+                description: "Lets CopyCopy read which app you copied from.",
+                isGranted: model.hasAccessibilityPermission,
+                openAction: { model.openAccessibilitySettings() })
+
+            PermissionStatusRow(
+                title: "Input Monitoring",
+                description: "Lets CopyCopy detect the double ⌘C gesture system-wide.",
+                isGranted: model.isEventTapRunning,
+                openAction: { model.openInputMonitoringSettings() })
+
+            Text("Both are required to detect the double ⌘C gesture. After granting, CopyCopy re-checks automatically.")
+                .foregroundStyle(.secondary)
         }
     }
 
