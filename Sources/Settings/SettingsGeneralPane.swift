@@ -47,7 +47,23 @@ struct SettingsGeneralPane: View {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(Color.ccSuccess)
-                        Text("\(BuiltInSkills.all.count) built-in skills active")
+                        let overridden = model.overriddenBuiltInSkillIds.count
+                        Text("\(BuiltInSkills.all.count - overridden) built-in skills active")
+                    }
+
+                    if !model.overriddenBuiltInSkillIds.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .foregroundStyle(Color.ccAccent)
+                                Text("\(model.overriddenBuiltInSkillIds.count) built-in \(model.overriddenBuiltInSkillIds.count == 1 ? "skill" : "skills") overridden by custom SKILL.md")
+                            }
+                            Text(model.overriddenBuiltInSkillIds.sorted().joined(separator: ", "))
+                                .font(.footnote.monospaced())
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.leading, 22)
+                        }
                     }
 
                     HStack(spacing: 8) {

@@ -71,6 +71,44 @@ final class SkillLoaderTests: XCTestCase {
         XCTAssertTrue(EntityFilter.any.matchesAny([.json]))
     }
 
+    func testMatchingActionsTruncatesToLimit() {
+        // A plain-text copy matches several built-in text skills (clean-text, fix-grammar,
+        // summarize, extract-action-items, decode-url, …). Without a limit the full ranked
+        // list is returned; with a limit the already-ranked list is truncated in place.
+        let loader = SkillLoader()
+        let executor = ToolExecutor()
+        let snapshot = ClipboardSnapshot(
+            changeCount: 1,
+            kind: .plainText,
+            summary: "text",
+            plainText: String(repeating: "word ", count: 40)
+        )
+        let context = ClipboardContext(copyEvent: nil, snapshot: snapshot, capturedAt: 0)
+
+        let uncapped = loader.matchingActions(
+            for: .plainText,
+            sourceContext: .other,
+            entities: [],
+            context: context,
+            executor: executor
+        )
+        // Several text skills always match a plain-text copy.
+        XCTAssertGreaterThan(uncapped.count, 3)
+
+        let limit = 3
+        let capped = loader.matchingActions(
+            for: .plainText,
+            sourceContext: .other,
+            entities: [],
+            context: context,
+            executor: executor,
+            limit: limit
+        )
+        XCTAssertEqual(capped.count, min(limit, uncapped.count))
+        // Truncation preserves the top of the already-ranked list (no reordering).
+        XCTAssertEqual(capped.map(\.skillId), Array(uncapped.prefix(limit)).map(\.skillId))
+    }
+
     func testUsageHistoryBoostFormula() {
         // boost = min(50, count * 10)
         // 0 uses → 0 boost

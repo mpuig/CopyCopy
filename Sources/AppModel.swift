@@ -10,6 +10,10 @@ final class AppModel: ObservableObject {
     @Published var suggestedActions: [SuggestedAction] = []
     @Published var triggerPulseID: UUID = UUID()
 
+    /// Built-in skill ids replaced by a custom `~/.copycopy/skills/<id>/SKILL.md`.
+    /// Surfaced in Settings so a silent override is visible to the user.
+    @Published var overriddenBuiltInSkillIds: [String] = []
+
     private let settings: AppSettings
     private let skillLoader = SkillLoader()
     private let actionExecutor = ToolExecutor()
@@ -50,6 +54,7 @@ final class AppModel: ObservableObject {
     init(settings: AppSettings) {
         self.settings = settings
         self.copyEventTap.doublePressThreshold = settings.doubleCopyThresholdMs / 1000.0
+        self.overriddenBuiltInSkillIds = skillLoader.overriddenBuiltInIds
         start()
 
         settings.$doubleCopyThresholdMs
@@ -260,7 +265,8 @@ final class AppModel: ObservableObject {
             sourceContext: sourceContext,
             entities: ctx.snapshot.detectedEntities,
             context: ctx,
-            executor: actionExecutor
+            executor: actionExecutor,
+            limit: SkillLoader.maxPrimarySuggestions
         )
 
         suggestedActions = actions
