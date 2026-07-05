@@ -68,4 +68,4 @@ Key management:
 
 - **Back up the private key** — export it with `.build/artifacts/sparkle/Sparkle/bin/generate_keys -x backup.key` and store it safely. If it is lost you must ship a new public key in a new release.
 - **Bootstrap:** builds at or before v0.4.0 shipped *without* `SUPublicEDKey`, so they cannot validate the feed. Those users upgrade once via Homebrew or a direct download to a key-bearing build (v0.4.1+); Sparkle self-updates work from there.
-- To rotate the key: `generate_keys` (new keypair) → update `SPARKLE_PUBLIC_ED_KEY` in `version.env` (and `AppBundle/Info.plist`) → reset the `SPARKLE_PRIVATE_KEY` secret.
+- To rotate the key: `generate_keys` (new keypair) → update `SPARKLE_PUBLIC_ED_KEY` in `version.env` → reset the `SPARKLE_PRIVATE_KEY` secret.

@@ -10,5 +10,11 @@ xcuserdata
 /_check_repos/
 *.profraw
 
+# Node
+node_modules/
+
+# Release artifacts
+CopyCopy-*.zip*
+
 # Local evaluation outputs
 Evaluations/results/
