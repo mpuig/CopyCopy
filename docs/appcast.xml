@@ -10,5 +10,14 @@
          SUPublicEDKey and cannot validate these signatures; in-app updates work
          from v0.4.1 onward (upgrade once via Homebrew or download to bootstrap). -->
     <!-- RELEASE_ITEMS -->
+    <item>
+      <title>0.4.1</title>
+      <link>https://github.com/mpuig/CopyCopy/releases/tag/v0.4.1</link>
+      <sparkle:version>6</sparkle:version>
+      <sparkle:shortVersionString>0.4.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Sun, 05 Jul 2026 11:31:30 +0000</pubDate>
+      <enclosure url="https://github.com/mpuig/CopyCopy/releases/download/v0.4.1/CopyCopy-v0.4.1-macos.zip" sparkle:edSignature="khMuec+CdGp+/7Go4Brl5c+sgm6IIoUqqh3U2rCOC2/M11Z7+5ZBWJ2KAqJquNaNxMBagS8mRF/Daa9VFcrwDw==" length="10982608" type="application/octet-stream" />
+    </item>
   </channel>
 </rss>
