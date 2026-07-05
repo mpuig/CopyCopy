@@ -46,12 +46,29 @@ resign_sparkle_if_present() {
   codesign_one "$sparkle"
 }
 
+# build.sh ad-hoc signs the whole bundle (no APP_IDENTITY in that step), and the
+# app-bundle sign below is not --deep, so nested frameworks keep their ad-hoc
+# signature unless we re-sign them inside-out here. An ad-hoc-signed nested
+# framework (no Developer ID, no secure timestamp, no hardened runtime) makes
+# notarization come back Invalid — so llama.framework must be re-signed too.
+resign_llama_if_present() {
+  local llama="$APP_BUNDLE/Contents/Frameworks/llama.framework"
+  [[ -d "$llama" ]] || return 0
+
+  log "Signing llama.framework"
+  if [[ -f "$llama/Versions/Current/llama" ]]; then
+    codesign_one "$llama/Versions/Current/llama"
+  fi
+  codesign_one "$llama"
+}
+
 log "==> Ensuring app contents won't break code sealing"
 xattr -cr "$APP_BUNDLE" 2>/dev/null || true
 find "$APP_BUNDLE" -name '._*' -delete 2>/dev/null || true
 
 log "==> Signing"
 resign_sparkle_if_present
+resign_llama_if_present
 codesign_one "$APP_BUNDLE"
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
@@ -60,17 +77,33 @@ DITTO_BIN=${DITTO_BIN:-/usr/bin/ditto}
 "$DITTO_BIN" --norsrc -c -k --keepParent "$APP_BUNDLE" "$TMP_ZIP"
 
 log "==> Submitting to Apple notary service"
+# Build the credential args once so both `submit` and `log` reuse them.
+NOTARY_CRED=()
 if [[ -n "${NOTARYTOOL_KEYCHAIN_PROFILE:-}" ]]; then
-  xcrun notarytool submit "$TMP_ZIP" --keychain-profile "$NOTARYTOOL_KEYCHAIN_PROFILE" --wait
+  NOTARY_CRED=(--keychain-profile "$NOTARYTOOL_KEYCHAIN_PROFILE")
 elif [[ -n "${APP_STORE_CONNECT_API_KEY_P8:-}" && -n "${APP_STORE_CONNECT_KEY_ID:-}" && -n "${APP_STORE_CONNECT_ISSUER_ID:-}" ]]; then
   echo "$APP_STORE_CONNECT_API_KEY_P8" | sed 's/\\n/\n/g' > /tmp/copycopy-api-key.p8
-  xcrun notarytool submit "$TMP_ZIP" \
-    --key /tmp/copycopy-api-key.p8 \
-    --key-id "$APP_STORE_CONNECT_KEY_ID" \
-    --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
-    --wait
+  NOTARY_CRED=(--key /tmp/copycopy-api-key.p8 --key-id "$APP_STORE_CONNECT_KEY_ID" --issuer "$APP_STORE_CONNECT_ISSUER_ID")
 else
   fail "Missing notarization credentials: set NOTARYTOOL_KEYCHAIN_PROFILE or APP_STORE_CONNECT_API_KEY_P8 + APP_STORE_CONNECT_KEY_ID + APP_STORE_CONNECT_ISSUER_ID"
+fi
+
+# Capture output so we can inspect the final status. notarytool submit --wait
+# exits 0 even when the result is Invalid/Rejected, so we must parse it ourselves
+# and fetch the detailed log — otherwise we'd blindly try to staple a bundle that
+# was never notarized (which fails later with an opaque "Record not found").
+SUBMIT_OUTPUT="$(xcrun notarytool submit "$TMP_ZIP" "${NOTARY_CRED[@]}" --wait 2>&1)" || true
+printf '%s\n' "$SUBMIT_OUTPUT"
+
+SUBMISSION_ID="$(printf '%s\n' "$SUBMIT_OUTPUT" | awk '/^[[:space:]]*id:/{print $2; exit}')"
+FINAL_STATUS="$(printf '%s\n' "$SUBMIT_OUTPUT" | awk -F': ' '/^[[:space:]]*status:/{s=$2} END{print s}')"
+
+if [[ "$FINAL_STATUS" != "Accepted" ]]; then
+  log "==> Notarization did not succeed (status: ${FINAL_STATUS:-unknown}); fetching detailed log"
+  if [[ -n "$SUBMISSION_ID" ]]; then
+    xcrun notarytool log "$SUBMISSION_ID" "${NOTARY_CRED[@]}" || true
+  fi
+  fail "Notarization failed (status: ${FINAL_STATUS:-unknown}). See the issues log above."
 fi
 
 log "==> Stapling notarization ticket"
