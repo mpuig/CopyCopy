@@ -56,11 +56,20 @@ for bundle in "$ARM_BUILD_DIR"/*.bundle; do
 done
 shopt -u nullglob
 
+# Expose the brand fonts at a stable Bundle.main location (Contents/Resources/Fonts).
+# BrandFonts loads them from here via Bundle.main — NOT via SwiftPM's Bundle.module,
+# whose executable-target accessor only checks the .app root and a build-time
+# hardcoded .build path, and fatalErrors on user machines.
+if [ -d "$ROOT_DIR/Sources/Resources/Fonts" ]; then
+    cp -R "$ROOT_DIR/Sources/Resources/Fonts" "$APP_DIR/Contents/Resources/Fonts"
+    echo "  Copied brand fonts to Contents/Resources/Fonts"
+fi
+
 # `swift build` emits resource bundles declared with `.copy` (e.g. the app's own
 # CopyCopy_CopyCopy.bundle of Fonts) WITHOUT an Info.plist. macOS Bundle(url:)
-# refuses to load such a bundle, so the generated `Bundle.module` accessor traps
-# with a fatalError at launch (BrandFonts.registerIfNeeded crashes on startup).
-# Synthesize a minimal Info.plist for any copied bundle that lacks one so it loads.
+# refuses to load such a bundle. This is no longer on the font-loading path, but
+# a bundle without Info.plist is still malformed for signing, so give any copied
+# bundle that lacks one a minimal Info.plist.
 shopt -s nullglob
 for bundle in "$APP_DIR/Contents/Resources/"*.bundle; do
     [ -d "$bundle" ] || continue

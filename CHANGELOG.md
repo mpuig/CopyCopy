@@ -1,13 +1,19 @@
 # Changelog
 
+## 0.5.2 — 2026-07-05
+
+### Fixed
+- **Crash on launch (v0.5.0 / v0.5.1)** — `BrandFonts` loaded its fonts through SwiftPM's `Bundle.module`. For an *executable* target that generated accessor only checks the `.app` root (never `Contents/Resources`, where the bundle is installed) and a build-time-hardcoded absolute `.build` path, then `fatalError`s when neither exists — so the packaged app trapped on startup on every machine except the one that built it. Fonts now load from `Bundle.main` (the app's own resources), and the build scripts install them at `Contents/Resources/Fonts`. (v0.5.1's `Info.plist` change did not address this — the real cause was the accessor's lookup paths, not a malformed bundle.)
+
+### Developer
+- Release smoke test now moves the build machine's `.build` resource bundle aside before launching, so the `Bundle.module` build-path fallback can no longer mask a packaged-app crash that would hit every user (which is how v0.5.0/v0.5.1 passed CI yet shipped broken).
+- `scripts/verify_app_bundle.sh` fails if any resource bundle lacks a lint-clean `Info.plist`.
+- Release workflow smoke-launches the signed app after notarization and fails on any startup crash.
+
 ## 0.5.1 — 2026-07-05
 
 ### Fixed
-- **Crash on launch (v0.5.0)** — release builds (`build.sh` / `swift build`) emitted the app's own `CopyCopy_CopyCopy.bundle` (brand fonts) without an `Info.plist`, so macOS `Bundle(url:)` refused to load it and the SwiftPM `Bundle.module` accessor trapped during `BrandFonts.registerIfNeeded()` at startup. `build.sh` now synthesizes a minimal `Info.plist` for any resource bundle missing one.
-
-### Developer
-- `scripts/verify_app_bundle.sh` now fails if any resource bundle lacks a lint-clean `Info.plist` (previously only checked for KeyboardShortcuts).
-- Release workflow now smoke-launches the built app and fails if it crashes on startup — the release pipeline previously never executed the app, so a reproducible launch crash shipped notarized.
+- Attempted fix for the v0.5.0 launch crash by synthesizing a missing `Info.plist` for resource bundles. This did not resolve the crash (see 0.5.2) but the bundle hardening is retained.
 
 ## 0.5.0 — 2026-07-05
 

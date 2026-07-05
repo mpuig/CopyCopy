@@ -108,11 +108,35 @@ enum BrandFonts {
         guard !didRegister else { return }
         didRegister = true
         for name in fileNames {
-            guard let url = Bundle.module.url(forResource: name, withExtension: "ttf", subdirectory: "Fonts") else {
-                continue
-            }
+            guard let url = fontURL(named: name) else { continue }
             CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         }
+    }
+
+    /// Resolves a bundled font from the running app's own resources.
+    ///
+    /// Deliberately avoids SwiftPM's `Bundle.module`: for an *executable* target
+    /// that generated accessor only checks the `.app` root (never
+    /// `Contents/Resources`, where the resource bundle is actually installed) and
+    /// a build-time-hardcoded absolute `.build` path, then `fatalError`s when
+    /// neither exists. That crashed the packaged app on launch on every machine
+    /// except the one that built it (whose `.build` path happened to resolve).
+    /// Looking under `Bundle.main` instead covers the layouts produced by both
+    /// build.sh (flat SPM bundle) and xcodebuild (Contents/Resources bundle).
+    private static func fontURL(named name: String) -> URL? {
+        guard let resourceURL = Bundle.main.resourceURL else { return nil }
+        let file = "\(name).ttf"
+        let relativePaths = [
+            "Fonts/\(file)",
+            "CopyCopy_CopyCopy.bundle/Fonts/\(file)",
+            "CopyCopy_CopyCopy.bundle/Contents/Resources/Fonts/\(file)",
+        ]
+        let fm = FileManager.default
+        for path in relativePaths {
+            let url = resourceURL.appendingPathComponent(path)
+            if fm.fileExists(atPath: url.path) { return url }
+        }
+        return nil
     }
 }
 

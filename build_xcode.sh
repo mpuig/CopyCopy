@@ -53,6 +53,12 @@ for bundle in "$ROOT_DIR/.build/derived/Build/Products/Release/"*.bundle; do
     fi
 done
 
+# Expose brand fonts at a stable Bundle.main path (BrandFonts loads them from here,
+# not via SwiftPM's Bundle.module — see build.sh / BrandTheme.swift for why).
+if [ -d "$ROOT_DIR/Sources/Resources/Fonts" ]; then
+    cp -R "$ROOT_DIR/Sources/Resources/Fonts" "$APP_DIR/Contents/Resources/Fonts"
+fi
+
 # Create Info.plist
 cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

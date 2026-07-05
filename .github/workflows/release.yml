@@ -112,15 +112,21 @@ jobs:
           count_crashes() { find "$DIAG" -maxdepth 1 -name 'CopyCopy-*.ips' 2>/dev/null | wc -l | tr -d ' '; }
           before="$(count_crashes)"
 
+          # Defeat SwiftPM's Bundle.module buildPath fallback. That accessor's
+          # second candidate is a hardcoded absolute .build path that resolves ONLY
+          # on the build machine — so a packaged app that still relied on it would
+          # run fine here while crashing on every user machine (exactly how v0.5.0
+          # and v0.5.1 shipped broken). Move the just-built .build resource bundles
+          # aside so this launch exercises only what actually ships in the .app.
+          find .build -type d -name 'CopyCopy_CopyCopy.bundle' -print0 2>/dev/null \
+            | while IFS= read -r -d '' d; do mv "$d" "$d.smokebak"; done
+
           # Runs AFTER signing so it exercises the real shipped artifact under
-          # hardened runtime — the condition under which the v0.5.0 Bundle.module
-          # trap actually fired (an unsigned/ad-hoc build does not reproduce it).
-          # The trap is a fatalError -> SIGTRAP (exit 133) plus an .ips crash
-          # report. A menu-bar (LSUIElement) app cannot hold a GUI session on the
-          # headless runner, so "no longer running" is NOT a failure by itself —
-          # only real crash evidence (a new crash report, or death by a fatal
-          # signal) fails the release. Deterministic bundle-structure regressions
-          # are already caught by verify_app_bundle.sh above.
+          # hardened runtime. A menu-bar (LSUIElement) app cannot hold a GUI
+          # session on the headless runner, so "no longer running" is NOT a failure
+          # by itself — only real crash evidence (a new crash report, or death by a
+          # fatal signal) fails the release. Deterministic bundle-structure
+          # regressions are also caught by verify_app_bundle.sh above.
           "$BIN" >/tmp/cc_out.log 2>/tmp/cc_err.log &
           pid=$!
           for _ in $(seq 1 8); do
