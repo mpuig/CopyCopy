@@ -11,6 +11,15 @@
          from v0.4.1 onward (upgrade once via Homebrew or download to bootstrap). -->
     <!-- RELEASE_ITEMS -->
     <item>
+      <title>0.5.0</title>
+      <link>https://github.com/mpuig/CopyCopy/releases/tag/v0.5.0</link>
+      <sparkle:version>7</sparkle:version>
+      <sparkle:shortVersionString>0.5.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Sun, 05 Jul 2026 16:49:27 +0000</pubDate>
+      <enclosure url="https://github.com/mpuig/CopyCopy/releases/download/v0.5.0/CopyCopy-v0.5.0-macos.zip" sparkle:edSignature="A6a4aF2B/2x38jtrSiCLCdezPSZY1KgPHAN5hjW2StM/fLqzKo3gqm/Lf4XFEHN1Yy0JA3of/Ffdi/zH2qMpCQ==" length="11371020" type="application/octet-stream" />
+    </item>
+    <item>
       <title>0.4.1</title>
       <link>https://github.com/mpuig/CopyCopy/releases/tag/v0.4.1</link>
       <sparkle:version>6</sparkle:version>
