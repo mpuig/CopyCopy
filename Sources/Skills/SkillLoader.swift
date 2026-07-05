@@ -9,6 +9,16 @@ final class SkillLoader {
 
     private var skills: [Skill] = []
 
+    /// Maximum number of primary suggestions to surface for a single copy. Most built-in
+    /// skills declare only `content-types: text`, so a generic text copy matches nearly all
+    /// of them; without a cap the panel would list ~20 actions. The list is already ranked
+    /// by relevance/usage before truncation, so this keeps the strongest matches only.
+    static let maxPrimarySuggestions = 8
+
+    /// Built-in skill ids that a user-provided custom skill replaced during the last load.
+    /// Surfaced in Settings so the override is visible instead of only logged.
+    private(set) var overriddenBuiltInIds: [String] = []
+
     init() {
         exportBuiltInSkillsIfNeeded()
         loadAll()
@@ -16,6 +26,7 @@ final class SkillLoader {
 
     func loadAll() {
         var loaded: [Skill] = []
+        overriddenBuiltInIds = []
 
         for (id, content) in BuiltInSkills.all {
             do {
@@ -133,7 +144,8 @@ final class SkillLoader {
         sourceContext: SourceAppContext,
         entities: [DetectedEntityType],
         context: ClipboardContext,
-        executor: ToolExecutor
+        executor: ToolExecutor,
+        limit: Int? = nil
     ) -> [SuggestedAction] {
         var ranked: [(skill: Skill, order: Int, score: Int)] = []
 
@@ -149,14 +161,19 @@ final class SkillLoader {
             ))
         }
 
-        return ranked
-            .sorted {
-                if $0.score == $1.score {
-                    return $0.order < $1.order
-                }
-                return $0.score > $1.score
+        let sorted = ranked.sorted {
+            if $0.score == $1.score {
+                return $0.order < $1.order
             }
-            .map { toSuggestedAction($0.skill, context: context, executor: executor) }
+            return $0.score > $1.score
+        }
+
+        // Truncate the already-ranked list so a generic copy doesn't flood the panel.
+        // Only the primary suggestion path passes a limit; follow-up matching keeps the
+        // full pool so its own filter + prefix has candidates to work with.
+        let capped = limit.map { Array(sorted.prefix(max(0, $0))) } ?? sorted
+
+        return capped.map { toSuggestedAction($0.skill, context: context, executor: executor) }
     }
 
     // MARK: - Matching
@@ -288,6 +305,9 @@ final class SkillLoader {
                 let parsed = try SkillParser.parseAll(id: id, content: content, isBuiltIn: false)
                 for skill in parsed {
                     if let existingIndex = skills.firstIndex(where: { $0.id == skill.id }) {
+                        if skills[existingIndex].isBuiltIn, !overriddenBuiltInIds.contains(skill.id) {
+                            overriddenBuiltInIds.append(skill.id)
+                        }
                         skills[existingIndex] = skill
                         Logger.info("Custom skill '\(skill.id)' overrides built-in", category: .general)
                     } else {
