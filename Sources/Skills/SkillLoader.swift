@@ -176,6 +176,66 @@ final class SkillLoader {
         return capped.map { toSuggestedAction($0.skill, context: context, executor: executor) }
     }
 
+    // MARK: - Freeform intent routing
+
+    /// Stopwords ignored when matching a freeform ask against skill keywords so
+    /// generic filler ("the copied text") doesn't create spurious matches.
+    private static let freeformStopwords: Set<String> = [
+        "the", "this", "that", "these", "those", "a", "an", "to", "of", "in", "on",
+        "for", "and", "or", "it", "its", "my", "your", "please", "me", "with",
+        "into", "from", "as", "text", "copied", "clipboard", "content", "make", "here"
+    ]
+
+    /// Attempts to route a freeform ask to a tuned AI skill by matching the ask
+    /// against each skill's `name`/`description` keywords. Conservative: only
+    /// returns a skill on a strong (skill-name token) match — everything else
+    /// returns `nil` so the caller falls through to the generic freeform prompt.
+    func freeformSkillMatch(
+        for ask: String,
+        context: ClipboardContext,
+        executor: ToolExecutor
+    ) -> SuggestedAction? {
+        let askNormalized = Self.normalizeForMatching(ask)
+        let askTokens = Set(askNormalized.split(separator: " ").map(String.init))
+        guard !askTokens.isEmpty else { return nil }
+
+        var best: (skill: Skill, score: Int)?
+        for skill in skills {
+            // Only AI skills are sensible freeform targets — never route to a
+            // function skill (Open URL, Reveal in Finder, …).
+            guard let fn = skill.executeFunction, fn == .llmPrompt || fn == .summarize else { continue }
+
+            let nameNormalized = Self.normalizeForMatching(skill.name)
+            let nameTokens = nameNormalized.split(separator: " ").map(String.init)
+                .filter { $0.count >= 3 && !Self.freeformStopwords.contains($0) }
+            guard !nameTokens.isEmpty else { continue }
+
+            let nameMatches = nameTokens.filter { askTokens.contains($0) }.count
+            var score = nameMatches * 10
+            if !nameNormalized.isEmpty, askNormalized.contains(nameNormalized) { score += 5 }
+
+            let descTokens = Set(Self.normalizeForMatching(skill.description)
+                .split(separator: " ").map(String.init)
+                .filter { $0.count >= 4 && !Self.freeformStopwords.contains($0) })
+            score += descTokens.intersection(askTokens).count
+
+            if score > (best?.score ?? 0) { best = (skill, score) }
+        }
+
+        // Require at least one skill-name token in the ask (score >= 10) so only
+        // strong matches redirect; weaker/description-only overlap stays generic.
+        guard let match = best, match.score >= 10 else { return nil }
+        return toSuggestedAction(match.skill, context: context, executor: executor)
+    }
+
+    /// Lowercases and reduces text to space-separated alphanumeric tokens.
+    private static func normalizeForMatching(_ text: String) -> String {
+        let mapped = text.lowercased().unicodeScalars.map { scalar -> Character in
+            CharacterSet.alphanumerics.contains(scalar) ? Character(scalar) : " "
+        }
+        return String(mapped).split(separator: " ").joined(separator: " ")
+    }
+
     // MARK: - Matching
 
     private func skillMatches(

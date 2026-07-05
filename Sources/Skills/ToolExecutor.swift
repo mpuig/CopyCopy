@@ -35,6 +35,30 @@ final class ToolExecutor {
         }
     }
 
+    /// Public entry for a freeform ask: runs an arbitrary system + user prompt
+    /// through the same streaming `.llmPrompt` path the skills use, so the
+    /// freeform feature reuses one execution path. Returns a cancel closure.
+    @discardableResult
+    func runFreeformPrompt(
+        prompt: String,
+        systemPrompt: String,
+        temperature: Float,
+        context: ClipboardContext,
+        completion: @escaping ActionCompletion,
+        onToken: @escaping StreamCallback = { _ in },
+        onStatus: @escaping StatusCallback = { _ in }
+    ) -> (() -> Void)? {
+        execute(
+            function: .llmPrompt,
+            parameters: ["prompt": prompt, "systemPrompt": systemPrompt],
+            context: context,
+            completion: completion,
+            onToken: onToken,
+            onStatus: onStatus,
+            temperature: temperature
+        )
+    }
+
     private var modelDefaultTemperature: Float {
         LocalLLMService.shared.currentModelDefinition?.defaultTemperature ?? 0.3
     }
